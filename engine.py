@@ -769,11 +769,11 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         """
         # If the config says to not change context on active document change, then
         # we don't do anything here.
-#         if not self.get_setting("automatic_context_switch"):
-#             self.logger.debug(
-#                 "Engine setting automatic_context_switch is false. Not changing context."
-#             )
-#             return
+        if not self.get_setting("automatic_context_switch"):
+            self.logger.debug(
+                "Engine setting automatic_context_switch is false. Not changing context."
+            )
+            return
 
         # Make sure we have a properly-encoded string for the path. We can
         # possibly get a file path/name that contains unicode, and we don't
