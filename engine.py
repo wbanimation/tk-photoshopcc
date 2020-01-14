@@ -15,10 +15,9 @@ import tempfile
 import threading
 import uuid
 import re
-
+import imp
 
 from contextlib import contextmanager
-
 
 import sgtk
 from sgtk.util.filesystem import ensure_folder_exists
@@ -299,11 +298,57 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         # Since this is running in our own Qt event loop, we'll use the bundled
         # dark look and feel. breaking encapsulation to do so.
-        self.logger.debug("Initializing default styling...")
+        self.logger.info("Initializing default styling...")
         self._initialize_dark_look_and_feel()
 
         # Sets up the heartbeat timer to run asynchronously.
         self.__setup_connection_timer(force=True)
+
+        # Normally the bootstrap logic would handle the file open, but since the bootstrap logic is handled by
+        # the adobe framework, and is generic, we should handle it here.
+        file_to_open = os.environ.get("SGTK_FILE_TO_OPEN")
+
+        if "MODELSHEET_PUB_FILE_IDS" in os.environ:
+            
+            self.logger.info ('Launching Add Model Sheet... ')
+            
+            # cant do a normal import because this is a hook
+            add_model_sheet_layer = imp.load_source('add_model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','add_model_sheet_layer.py'))
+            add_model_sheet_layer.add_model_sheet_layer(self)
+        
+        elif "SHOTGUN_LOAD_FILE_ON_OPEN" in os.environ :
+            
+            # grab the environment variables that were set for us
+            path = os.environ.get('SHOTGUN_LOAD_FILE_ON_OPEN')
+            
+            # double check that the file exists. it will crash engine if it does not...
+            if os.path.exists(path) :
+                self.logger.info ('Opening File: %s' % path)
+                
+                # create adobe file object
+                file_object = self.adobe.File(path)
+                # set read only
+                file_object.readonly = True
+                # now open the file as read-only
+                self.adobe.app.load(file_object)
+        
+        # if there are no files to open found in the env launch WorkFiles2 'File Open...'
+        # this happens in the post_qt_init() for each specific engine
+        if file_to_open:
+            self.logger.info ('Opening File: %s' % file_to_open)
+            # open the specified file
+            self.adobe.app.open(self.adobe.File(file_to_open))
+            # clear the environment variable after loading so that it doesn't get reopened on an engine restart.
+            del os.environ["SGTK_FILE_TO_OPEN"]
+        else:
+            # If there is no file_to_open show WorkFiles 'File Open...'
+            if len(list(self.adobe.app.documents)) == 0:
+                # check for the File Open command
+                if 'File Open...' in self.commands :
+                    self.logger.info ('Opening WorkFiles2...')
+                    uid = self.commands['File Open...']['properties']['uid']
+                    self.logger.info ('   uid: %s' % uid)
+                    self._handle_command(uid)
 
     def register_command(self, name, callback, properties=None):
         """
@@ -724,11 +769,11 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         """
         # If the config says to not change context on active document change, then
         # we don't do anything here.
-        if not self.get_setting("automatic_context_switch"):
-            self.logger.debug(
-                "Engine setting automatic_context_switch is false. Not changing context."
-            )
-            return
+#         if not self.get_setting("automatic_context_switch"):
+#             self.logger.debug(
+#                 "Engine setting automatic_context_switch is false. Not changing context."
+#             )
+#             return
 
         # Make sure we have a properly-encoded string for the path. We can
         # possibly get a file path/name that contains unicode, and we don't
