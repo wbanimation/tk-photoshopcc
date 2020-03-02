@@ -188,35 +188,36 @@ def model_sheet_layer( engine,
             sg_model_sheet_image = None
         
         if sg_model_sheet_image is not None:
-        # turn off isBackgroundLayer flag and make it capable of transparency
-            sg_model_sheet_image.artLayers[0].isBackgroundLayer = False
-            # set the layer name
-            sg_model_sheet_image.artLayers[0].name = "Model Sheet Image"
+            with engine.context_changes_disabled():
+                # turn off isBackgroundLayer flag and make it capable of transparency
+                sg_model_sheet_image.artLayers[0].isBackgroundLayer = False
+                # set the layer name
+                sg_model_sheet_image.artLayers[0].name = "Model Sheet Image"
         
-            # set u its to PIXELS
-            app.preferences.rulerUnits = engine.adobe.Units.PIXELS
+                # set u its to PIXELS
+                app.preferences.rulerUnits = engine.adobe.Units.PIXELS
     
-            # get the height and width of sg_model_sheet_image
-            app.activeDocument = sg_model_sheet_image
-            _logo_width = app.activeDocument.width.value
-            _logo_height = app.activeDocument.height.value
-            _logo_aspect = float(_logo_height) / float(_logo_width)
+                # get the height and width of sg_model_sheet_image
+                app.activeDocument = sg_model_sheet_image
+                _logo_width = app.activeDocument.width.value
+                _logo_height = app.activeDocument.height.value
+                _logo_aspect = float(_logo_height) / float(_logo_width)
         
-            if _max_logo_aspect > _logo_aspect :
-                sg_model_sheet_image.resizeImage(_max_logo_width , int(_max_logo_width * _logo_aspect))
-            else :
-                sg_model_sheet_image.resizeImage(int(_max_logo_height * 1/_logo_aspect) ,_max_logo_height)
+                if _max_logo_aspect > _logo_aspect :
+                    sg_model_sheet_image.resizeImage(_max_logo_width , int(_max_logo_width * _logo_aspect))
+                else :
+                    sg_model_sheet_image.resizeImage(int(_max_logo_height * 1/_logo_aspect) ,_max_logo_height)
     
-            # get the new logo size
-            _logo_width = app.activeDocument.width.value
-            _logo_height = sg_model_sheet_image.height.value
+                # get the new logo size
+                _logo_width = app.activeDocument.width.value
+                _logo_height = sg_model_sheet_image.height.value
     
-        #     logger.info('_logo_scaled_width: %s    _logo_scaled_height: %s' % (_logo_width,_logo_height))
+            #     logger.info('_logo_scaled_width: %s    _logo_scaled_height: %s' % (_logo_width,_logo_height))
     
-            # duplicate sg_model_sheet_image into active document
-            model_sheet_image_layer = sg_model_sheet_image.artLayers[0].duplicate(current_active_document)
-            # close sg_model_sheet_image file
-            sg_model_sheet_image.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
+                # duplicate sg_model_sheet_image into active document
+                model_sheet_image_layer = sg_model_sheet_image.artLayers[0].duplicate(current_active_document)
+                # close sg_model_sheet_image file
+                sg_model_sheet_image.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
     
         # switch back to the main document
         app.activeDocument = current_active_document
@@ -457,7 +458,7 @@ def model_sheet_layer( engine,
             engine.adobe.rpc_eval('app.activeDocument.activeLayer.textItem.color.rgb.blue = 10')
         
         disclaimer_text = "(c) WARNER BROS. ENTERTAINMENT.\r"
-        disclaimer_text += "THIS MATERIAL IS THE PROPERTY OF WANER BROS. ANIMATION.\r"
+        disclaimer_text += "THIS MATERIAL IS THE PROPERTY OF WARNER BROS. ANIMATION.\r"
         disclaimer_text += "IT IS UNPUBLISHED & MUST NOT BE DISTRIBUTED,\r"
         disclaimer_text += "DUPLICATED OR USED IN ANY MANNER, EXCEPT FOR PRODUCTION\r"
         disclaimer_text += "PURPOSES, AND MAY NOT BE SOLD OR TRANSFERRED.\r"

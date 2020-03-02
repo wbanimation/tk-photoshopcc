@@ -109,7 +109,7 @@ class PhotoshopCCSceneCollector(HookBaseClass):
                 return
             document_item = parent_item.create_item(
                 "photoshop.document",
-                "Photoshop Image",
+                "Photoshop2 Image",
                 document.name
             )
             self.logger.info(
@@ -139,7 +139,7 @@ class PhotoshopCCSceneCollector(HookBaseClass):
             # create a publish item for the document
             document_item = parent_item.create_item(
                 "photoshop.document",
-                "Photoshop Image",
+                "Photoshop3 Image",
                 document.name
             )
 

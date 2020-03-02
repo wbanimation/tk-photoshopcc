@@ -331,6 +331,14 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 #                file_object.readonly = True
                 # now open the file as read-only
                 self.adobe.app.load(file_object)
+                
+#                 self.logger.info (' ===== storing context: %s' % context)
+#                 
+#                 self.__add_to_context_cache(path, self.context)
+                
+                del os.environ["SHOTGUN_LOAD_FILE_ON_OPEN"]
+                
+                
         
         # if there are no files to open found in the env launch WorkFiles2 'File Open...'
         # this happens in the post_qt_init() for each specific engine
@@ -1625,6 +1633,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # scope would be unusable, as we don't allow context changing across
             # project boundaries.
             self._CONTEXT_CACHE[path] = context
+            
+            self.logger.info("Storing context cache1: %s" % context)
 
             serial_cache = dict()
             for k, v in self._CONTEXT_CACHE.iteritems():
@@ -1643,6 +1653,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         :returns: Context object, or None
         """
+        self.logger.error("===== _CONTEXT_CACHE: %s" % (self._CONTEXT_CACHE,))
+        
         return self._CONTEXT_CACHE.get(path)
 
     def __request_context_display(self, entity):
