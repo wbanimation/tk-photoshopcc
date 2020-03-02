@@ -328,7 +328,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 # create adobe file object
                 file_object = self.adobe.File(path)
                 # set read only
-                file_object.readonly = True
+#                file_object.readonly = True
                 # now open the file as read-only
                 self.adobe.app.load(file_object)
         
