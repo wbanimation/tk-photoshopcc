@@ -40,14 +40,15 @@ def model_sheet_layer( engine,
     _banner_min_height = 150
     _banner_aspect = 0.08
     
-#     project_type = '2D'
+#    project_type = '2D'
     
     # main column layouts
     if project_type == '2D' :
-        _logo_position = 0.00
-        _info_position = 0.32
-        _2d_label_position = 0.62
-        _2d_info_position = 0.625
+        _logo_position = 0.01
+#         _info_position = 0.32
+        _info_position = 0.25
+        _2d_label_position = 0.59
+        _2d_info_position = 0.595
         _disclaimer_position = 0.73
     else :
         _logo_position = 0.37
@@ -301,18 +302,41 @@ def model_sheet_layer( engine,
         if episode_name == "" :
             model_sheet_text =  project_name + "\r"
         else :
-            model_sheet_text =  project_name + "                      Episode: "+episode_name+"\r"
+            model_sheet_text =  project_name + "                      Ep: "+episode_name+"\r"
+        
+        if task_name != "" :
+            # asset type    task name
+            model_sheet_text += asset_type + "                      "+task_name +"\r"
+        else :
+            # task name
+            model_sheet_text += asset_type + "\r"
+        
+        # asset name
+        if asset_name != "" :
+            model_sheet_text += asset_name + "\r"
+        
+        # assigned to
+        if assigned_to != "" :
+            model_sheet_text += assigned_to + "\r"
+        
+        # version
+        if version_name != "" :
+            model_sheet_text += version_name + "\r"
+
+        
     # 2D Project Only
     else :
-       model_sheet_text =  project_name + "\r"
+        model_sheet_text =  project_name + "\r"
     
-    # Version
-    if version_name != "" :
-        model_sheet_text += version_name + "\r"
-    model_sheet_text += asset_name + "\r"
-    model_sheet_text += asset_type + "\r"
-    if task_name != "" :
-        model_sheet_text += task_name + "\r"
+        # Version
+        if version_name != "" :
+            model_sheet_text += version_name + "\r"
+        model_sheet_text += asset_name + "\r"
+        if asset_type != "" :
+            model_sheet_text += asset_type + "\r"
+        if task_name != "" :
+            model_sheet_text += task_name + "\r"
+#             model_sheet_text += assigned_to + "\r"
         
     
     text_layer2.textItem.contents = model_sheet_text
@@ -348,15 +372,15 @@ def model_sheet_layer( engine,
     
         model_sheet_label = ''
         if episode_name != "" :
-            model_sheet_label += "Episode : " 
+            model_sheet_label += "Episode : " + "\r"
         if ship_episode != "" :
-            model_sheet_label += "\rShip Episode : " 
+            model_sheet_label += "Ship Episode : " + "\r"
         if current_sc != "" :
-            model_sheet_label += "\rCurrent Scene : " 
+            model_sheet_label += "Current Scene : " + "\r"
         if sap_number != "" :
-            model_sheet_label += "\rSAP Number : " 
+            model_sheet_label += "SAP Number : " + "\r"
         if assigned_to != "" :
-            model_sheet_label += "\rAssigned To : "
+            model_sheet_label += "Assigned To : " + "\r"
                 
         text_layer3.textItem.contents = model_sheet_label
         text_layer3.move(model_sheet_group, engine.adobe.ElementPlacement.INSIDE)
