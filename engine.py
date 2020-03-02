@@ -371,6 +371,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             properties,
         )
 
+    def add_to_context_cache(self, path, context) :
+        
+        self.__add_to_context_cache(path, context)
+        
     def export_as_jpeg(self, document=None, output_path=None, max_size=2048, quality=12):
         """
         Export a Jpeg image from the given document or from the current document.
