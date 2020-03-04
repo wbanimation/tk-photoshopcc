@@ -54,6 +54,10 @@ def add_model_sheet_layer(engine) :
     # then we need to look up some additional information based on the published file information
     # now open up each file and add the model sheet information
     
+    # disable context switching to speed up file loading
+    engine._CONTEXT_CHANGES_DISABLED = True
+    engine._HEARTBEAT_DISABLED = True
+    
     for sg_pubfile in sg_pubfiles :
         
         project_name = ''
@@ -194,10 +198,14 @@ def add_model_sheet_layer(engine) :
         engine.adobe.app.activeDocument.saveAs(file_save, saveOptions ,True)
         engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
     
+    # re-enable context switching
+    # not that it matters...
+    engine._CONTEXT_CHANGES_DISABLED = False
+    engine._HEARTBEAT_DISABLED = False
+    
     # open the export folder
     if open_export_folder:
         subprocess.check_call(['open' ,export_folder])
-    
     
     # unset all of the environment variables
     os.unsetenv("MODELSHEET_EXPORT_FOLDER")
@@ -214,8 +222,6 @@ def add_model_sheet_layer(engine) :
     os.unsetenv("MODELSHEET_SHOW_DATE")
     
     # quit photoshop
-    # need to find out how to do this...
-#     idquit = engine.adobe.app.charIDToTypeID('quit')
     engine.adobe.app.executeAction(engine.adobe.app.charIDToTypeID('quit'), engine.adobe.undefined, engine.adobe.DialogModes.ALL)
 
 
