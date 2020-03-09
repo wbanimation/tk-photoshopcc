@@ -371,10 +371,6 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             properties,
         )
 
-    def add_to_context_cache(self, path, context) :
-        
-        self.__add_to_context_cache(path, context)
-        
     def export_as_jpeg(self, document=None, output_path=None, max_size=2048, quality=12):
         """
         Export a Jpeg image from the given document or from the current document.
@@ -487,6 +483,65 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 # Set dialog mode back to original.
                 adobe.app.displayDialogs = original_dialog_mode
         return jpeg_pub_path
+
+    def add_to_context_cache(self, path, context) :
+        """
+        Add a path:context entry to the _CONTEXT_CACHE.
+        
+        :param path: The path of the active document.
+        :param context: The current context form the document.
+        """        
+        self.__add_to_context_cache(path, context)
+
+    def add_model_sheet_layer(self,
+                                project_name,
+                                project_type,
+                                asset_name,
+                                task_name,
+                                version_name,
+                                asset_type,
+                                episode_name,
+                                ship_episode,
+                                current_sc,
+                                sap_number,
+                                assigned_to,
+                                banner_color,
+                                font,
+                                show_logo,
+                                show_labels,
+                                show_date,
+                                show_disclaimer) :
+        """
+        Create a New Layer in the current Document.
+        
+        :param project_name: The path of the active document.
+        :param project_type: Project Type 2D/3D.
+        """       
+        
+        model_sheet_layer = imp.load_source('model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','model_sheet_layer.py'))
+        
+        # add the model sheet layer
+        model_sheet_layer.model_sheet_layer(
+                                self,
+                                project_name,
+                                project_type,
+                                asset_name,
+                                task_name,
+                                version_name,
+                                asset_type,
+                                episode_name,
+                                ship_episode,
+                                current_sc,
+                                sap_number,
+                                assigned_to,
+                                banner_color,
+                                font,
+                                show_logo,
+                                show_labels,
+                                show_date,
+                                show_disclaimer
+                                )
+
 
     def generate_thumbnail(self, document=None, output_path=None):
         """
