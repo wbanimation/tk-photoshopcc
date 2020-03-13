@@ -14,18 +14,25 @@ import json
 import imp
 import subprocess
 from datetime import date
+# import publish_output
 
 # get the standard logger
 logger = sgtk.platform.get_logger(__name__)
 
 # cant do a normal import...
 model_sheet_layer = imp.load_source('model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'model_sheet_layer.py'))
+publish_output = imp.load_source('publish_output', os.path.join(os.path.dirname(os.path.realpath(__file__)),'publish_output.py'))
 
 today = date.today()
 
 def add_model_sheet_layer(engine) :
     
     # grab all the environment variables that were set for us
+    mode = json.loads(os.environ.get('MODELSHEET_EXPORT_MODE'))
+    version_playlist_mode = json.loads(os.environ.get('MODELSHEET_VERSION_PLAYLIST_MODE'))
+    update_version_status = json.loads(os.environ.get('MODELSHEET_UPDATE_STATUS'))
+    copy_version_links = json.loads(os.environ.get('MODELSHEET_COPY_LINKS'))
+    copy_version_notes = json.loads(os.environ.get('MODELSHEET_COPY_NOTES'))
     export_folder = json.loads(os.environ.get('MODELSHEET_EXPORT_FOLDER'))
     open_export_folder =  json.loads(os.environ.get('MODELSHEET_OPEN_EXPORT_FOLDER'))
     photoshop_file_ids = json.loads(os.environ.get('MODELSHEET_PUB_FILE_IDS'))
@@ -41,7 +48,8 @@ def add_model_sheet_layer(engine) :
     
     # get the sg_pubfile information from the file ids all at once
     selected_filter = [['project','is',engine.context.project]]
-    fields = ['code','path','task','entity']
+    fields = ['code','path','task','entity','version','version.Version.sg_status_list','version.Version.entity','version.Version.playlists','project.Project.tank_name',
+               'task.Task.sg_task_token','task.Task.content','task.Task.task_assignees','task.Task.sg_task_token']
     pubfiles_filter = []
     for id in photoshop_file_ids :
         pubfile_filter = ['id', 'is', int(id)]
@@ -104,22 +112,17 @@ def add_model_sheet_layer(engine) :
         # get the task information from the pubfile task field
         if sg_pubfile['task']:
             sg_task = sg_pubfile['task']
-            # check that we actually need this part...
-            task_filter = [['project','is',engine.context.project],
-                           ['id','is',sg_task['id']]]
-            task_fields = ['content','task_assignees']
-            sg_photoshopcc_task = engine.shotgun.find_one("Task",task_filter,task_fields)
             
-            if 'content' in sg_photoshopcc_task:
-                task_name = sg_photoshopcc_task['content']
-            if 'task_assignees' in sg_photoshopcc_task :
+            if 'task.Task.content' in sg_pubfile:
+                task_name = sg_pubfile['task.Task.content']
+            if 'task.Task.task_assignees' in sg_pubfile :
             
-                task_assignees = sg_photoshopcc_task['task_assignees']
+                task_assignees = sg_pubfile['task.Task.task_assignees']
                 task_assignees_list = []
                 for each_assignee in task_assignees :
                     task_assignees_list.append(each_assignee['name'])
                 assigned_to = ', '.join(task_assignees_list)
-            
+        
         # get the entity information from the pubfile entity field
         if sg_pubfile['entity']:
             sg_asset = sg_pubfile['entity']
@@ -147,12 +150,30 @@ def add_model_sheet_layer(engine) :
             if sg_photoshopcc_asset['sg_ship_episode.CustomEntity01.sg_sap_number'] != None :
                 sap_number = sg_photoshopcc_asset['sg_ship_episode.CustomEntity01.sg_sap_number']
         
+        try:
+            version_name = _get_version_name_from_filename(local_path.rsplit(os.sep,1)[1])
+        except :
+            version_name = ''
+        
+        engine.clear_busy()
+        engine.show_busy(
+            version_name,
+            "Opening Version... " +
+            "<br>" 
+            )
+        
         # open the photshop file
         file_open = engine.adobe.File(local_path)
         engine.adobe.app.load(file_open)
         
         # get the version name from the current file name
         version_name = _get_version_name_from_filename(engine.adobe.app.activeDocument.name)
+        
+        engine.show_busy(
+            version_name,
+            "Adding Model Sheet..." +
+            "<br>" 
+            )
         
         # add the model sheet layer
         model_sheet_layer.model_sheet_layer(
@@ -176,38 +197,127 @@ def add_model_sheet_layer(engine) :
                                 show_disclaimer
                                 )
         
-        # get the output name from the local_path
-        output_filename, extension = _get_output_filename(local_path, filename_prefix, filename_suffix, current_sc, ship_episode)
-        output_path = os.path.join(export_folder,output_filename)
-                    
-        # make sure directory exists
-        if not os.path.exists(export_folder) :
-            os.makedirs(export_folder)
-        
-        # save file to selected folder
-        saveOptions = engine.adobe.PhotoshopSaveOptions()
-        saveOptions.layers = True
+        # export versions
+        if mode == 0 :
+            
+            engine.show_busy(
+                version_name,
+                "Finding Next Version to Publish..." +
+                "<br>" 
+                )
+            
+            # need to get the correct output folder for the new Published File
+            work_template = engine.get_template("work_template")
+            publish_template = engine.get_template("publish_template")
+            
+#             logger.info(' ===== work_template: %s' % work_template)
+#             logger.info(' ===== publish_template: %s' % publish_template)
+            
+            version_number = 1
+            looking_for_highest_version = True
+            
+            # look for the current highest version number for the Design Package     
+            filters = [['project','is',context.project],['entity','is',sg_pubfile['version.Version.entity']]]
+            fields = ['code','sg_version_number']
+            sg_find_versions = engine.shotgun.find("Version",filters,fields)
+            
+            current_version_name = sg_pubfile['version']['name']
+            version_name_base = sg_pubfile['project.Project.tank_name']+'_'+sg_pubfile['version.Version.entity']['name']+'_'+sg_pubfile['task.Task.sg_task_token']+'_v'
+            
+            for find_version in sg_find_versions :
+                
+                if find_version['code'].startswith(version_name_base) :
+                    if int(find_version['sg_version_number']) > version_number :
+                        version_number = int(find_version['sg_version_number'])
+            
+            version_number +=1
+            new_version_name = sg_pubfile['project.Project.tank_name']+'_'+sg_pubfile['version.Version.entity']['name']+'_'+sg_pubfile['task.Task.sg_task_token']+'_v'+str(version_number).zfill(2)
+            publish_path = local_path.replace(current_version_name,new_version_name)
+            version_playlists = sg_pubfile['version.Version.playlists']
+            
+            publish_folder = publish_path.rsplit(os.sep,1)[0]
+            
+            # make sure publish directory exists
+            if not os.path.exists(publish_folder) :
+                os.makedirs(publish_folder)
+            
+            # save file to selected folder
+            saveOptions = engine.adobe.PhotoshopSaveOptions()
+            saveOptions.layers = True
+            
+            file_save = engine.adobe.File(publish_path)
+            engine.adobe.app.activeDocument.saveAs(file_save, saveOptions ,True)
 
-        # save the file as large document format is required
-        # need to find out how to do this...
-        if extension == 'psb' :
-#                 saveOptions.formatOptions = engine.adobe.FormatOptions.STANDARDBASELINE
-            pass
+            sg_version = publish_output.publish_output(engine, publish_path, publish_path, sg_pubfile['version.Version.entity'], sg_pubfile['task'], sg_pubfile['version.Version.sg_status_list'], new_version_name, version_playlists)
+            
+            # close the file
+            engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
+            
+            if copy_version_notes :
+                # get the notes attached to the version
+                filters = [['project','is',context.project],['note_links','in',sg_pubfile['version']]]
+                fields = ['note_links']
+                sg_notes = engine.shotgun.find('Note',filters,fields)
+                
+                for note in sg_notes :
+                    note_links = note['note_links']
+                    note_links.append(sg_version)
+                    data = {'note_links':note_links}
+                    result = engine.shotgun.update('Note', note['id'], data)
+            
+        # export to file system
+        elif mode == 1:
+            # get the output name from the local_path
+            output_filename, extension = _get_output_filename(local_path, filename_prefix, filename_suffix, current_sc, ship_episode)
+            output_path = os.path.join(export_folder,output_filename)
+            
+            engine.clear_busy()
+            engine.show_busy(
+                version_name,
+                "Exporting Photshop Document... " +
+                "<br>" 
+                )
+                    
+            # make sure directory exists
+            if not os.path.exists(export_folder) :
+                os.makedirs(export_folder)
         
-        file_save = engine.adobe.File(output_path)
-        engine.adobe.app.activeDocument.saveAs(file_save, saveOptions ,True)
-        engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
+            # save file to selected folder
+            saveOptions = engine.adobe.PhotoshopSaveOptions()
+            saveOptions.layers = True
+
+            # save the file as large document format is required
+            # need to find out how to do this...
+            if extension == 'psb' :
+#                 saveOptions.formatOptions = engine.adobe.FormatOptions.STANDARDBASELINE
+                pass
+        
+            file_save = engine.adobe.File(output_path)
+            engine.adobe.app.activeDocument.saveAs(file_save, saveOptions ,True)
+            engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
+            
+            # open the export folder
+            if open_export_folder:
+                subprocess.check_call(['open' ,export_folder])
+            
+            # quit photoshop
+#             engine.adobe.app.executeAction(engine.adobe.app.charIDToTypeID('quit'), engine.adobe.undefined, engine.adobe.DialogModes.ALL)
+    
+    engine.clear_busy()
+    
+    # quit photoshop
+    engine.adobe.app.executeAction(engine.adobe.app.charIDToTypeID('quit'), engine.adobe.undefined, engine.adobe.DialogModes.ALL)
     
     # re-enable context switching
     # not that it matters...
     engine._CONTEXT_CHANGES_DISABLED = False
     engine._HEARTBEAT_DISABLED = False
     
-    # open the export folder
-    if open_export_folder:
-        subprocess.check_call(['open' ,export_folder])
-    
     # unset all of the environment variables
+    os.unsetenv("MODELSHEET_EXPORT_MODE")
+    os.unsetenv("MODELSHEET_UPDATE_STATUS")
+    os.unsetenv("MODELSHEET_COPY_LINKS")
+    os.unsetenv("MODELSHEET_COPY_NOTES")
     os.unsetenv("MODELSHEET_EXPORT_FOLDER")
     os.unsetenv("MODELSHEET_OPEN_EXPORT_FOLDER")
     os.unsetenv("MODELSHEET_PUB_FILE_IDS")
@@ -220,9 +330,6 @@ def add_model_sheet_layer(engine) :
     os.unsetenv("MODELSHEET_SHOW_LABELS")
     os.unsetenv("MODELSHEET_SHOW_DISCLAIMER")
     os.unsetenv("MODELSHEET_SHOW_DATE")
-    
-    # quit photoshop
-    engine.adobe.app.executeAction(engine.adobe.app.charIDToTypeID('quit'), engine.adobe.undefined, engine.adobe.DialogModes.ALL)
 
 
 def _get_version_name_from_filename(filename):
