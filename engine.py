@@ -332,13 +332,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 # now open the file as read-only
                 self.adobe.app.load(file_object)
                 
-#                 self.logger.info (' ===== storing context: %s' % context)
-#                 
-#                 self.__add_to_context_cache(path, self.context)
-                
                 del os.environ["SHOTGUN_LOAD_FILE_ON_OPEN"]
-                
-                
         
         # if there are no files to open found in the env launch WorkFiles2 'File Open...'
         # this happens in the post_qt_init() for each specific engine
@@ -351,8 +345,16 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         else:
             # If there is no file_to_open show WorkFiles 'File Open...'
             if len(list(self.adobe.app.documents)) == 0:
-                # check for the File Open command
-                if 'File Open...' in self.commands :
+            
+                # launch TaskBook is available...
+                if 'Task Buddy...' in self.commands :
+                    self.logger.info ('Opening Task Buddy...')
+                    uid = self.commands['Task Buddy...']['properties']['uid']
+                    self.logger.info ('   uid: %s' % uid)
+                    self._handle_command(uid)
+                
+                # if not, check for the File Open command and launch it...
+                elif 'File Open...' in self.commands :
                     self.logger.info ('Opening WorkFiles2...')
                     uid = self.commands['File Open...']['properties']['uid']
                     self.logger.info ('   uid: %s' % uid)
