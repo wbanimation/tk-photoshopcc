@@ -16,6 +16,7 @@ import threading
 import uuid
 import re
 import imp
+import json
 
 from contextlib import contextmanager
 
@@ -309,31 +310,45 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         file_to_open = os.environ.get("SGTK_FILE_TO_OPEN")
 
         if "MODELSHEET_PUB_FILE_IDS" in os.environ:
-            
+
             self.logger.info ('Launching Add Model Sheet... ')
-            
+
             # cant do a normal import because this is a hook
             add_model_sheet_layer = imp.load_source('add_model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','add_model_sheet_layer.py'))
             add_model_sheet_layer.add_model_sheet_layer(self)
-        
-        elif "SHOTGUN_LOAD_FILE_ON_OPEN" in os.environ :
+
+        elif "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
+
+            self.logger.info ('Preparing To Load Files... ')
             
             # grab the environment variables that were set for us
-            path = os.environ.get('SHOTGUN_LOAD_FILE_ON_OPEN')
-            
-            # double check that the file exists. it will crash engine if it does not...
-            if os.path.exists(path) :
-                self.logger.info ('Opening File: %s' % path)
-                
-                # create adobe file object
-                file_object = self.adobe.File(path)
-                # set read only
-#                file_object.readonly = True
-                # now open the file as read-only
-                self.adobe.app.load(file_object)
-                
-                del os.environ["SHOTGUN_LOAD_FILE_ON_OPEN"]
-        
+            published_files_to_open = json.loads(os.environ.get('SHOTGUN_LOAD_FILES_ON_OPEN'))
+
+            self._CONTEXT_CHANGES_DISABLED = True
+            self._HEARTBEAT_DISABLED = True
+
+            for path in published_files_to_open.keys() :
+                # double check that the file exists. it will crash engine if it does not...
+                if os.path.exists(path) :
+                    self.logger.info ('Opening File: %s' % path)
+
+                    # open the file
+                    self.adobe.app.load(self.adobe.File(path))
+
+                    context = self.sgtk.context_from_entity(published_files_to_open[path]['entity_type'],published_files_to_open[path]['id'])
+                    self.__add_to_context_cache(path, context)
+                    sgtk.platform.change_context(context)
+
+                else :
+                    del published_files_to_open[path]
+
+            self._CONTEXT_CHANGES_DISABLED = False
+            self._HEARTBEAT_DISABLED = False
+            del os.environ["SHOTGUN_LOAD_FILES_ON_OPEN"]
+
+            # set the current context to the last file opened
+            sgtk.platform.change_context(context)
+
         # if there are no files to open found in the env launch WorkFiles2 'File Open...'
         # this happens in the post_qt_init() for each specific engine
         if file_to_open:
@@ -345,16 +360,17 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         else:
             # If there is no file_to_open show WorkFiles 'File Open...'
             if len(list(self.adobe.app.documents)) == 0:
-            
-                # launch TaskBook is available...
-                if 'Task Buddy...' in self.commands :
-                    self.logger.info ('Opening Task Buddy...')
-                    uid = self.commands['Task Buddy...']['properties']['uid']
-                    self.logger.info ('   uid: %s' % uid)
-                    self._handle_command(uid)
-                
+
+                # launch Task Buddy if available...
+#                 if 'Task Buddy...' in self.commands :
+#                     self.logger.info ('Opening Task Buddy...')
+#                     uid = self.commands['Task Buddy...']['properties']['uid']
+#                     self.logger.info ('   uid: %s' % uid)
+#                     self._handle_command(uid)
+
                 # if not, check for the File Open command and launch it...
-                elif 'File Open...' in self.commands :
+#                 elif 'File Open...' in self.commands :
+                if 'File Open...' in self.commands :
                     self.logger.info ('Opening WorkFiles2...')
                     uid = self.commands['File Open...']['properties']['uid']
                     self.logger.info ('   uid: %s' % uid)
