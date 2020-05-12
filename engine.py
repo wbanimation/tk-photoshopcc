@@ -313,41 +313,33 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
             self.logger.info ('Launching Add Model Sheet... ')
 
-            # cant do a normal import because this is a hook
+            # load the model sheet module
             add_model_sheet_layer = imp.load_source('add_model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','add_model_sheet_layer.py'))
             add_model_sheet_layer.add_model_sheet_layer(self)
 
         elif "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
 
             self.logger.info ('Preparing To Load Files... ')
-            
+
             # grab the environment variables that were set for us
             published_files_to_open = json.loads(os.environ.get('SHOTGUN_LOAD_FILES_ON_OPEN'))
-
-            self._CONTEXT_CHANGES_DISABLED = True
-            self._HEARTBEAT_DISABLED = True
 
             for path in published_files_to_open.keys() :
                 # double check that the file exists. it will crash engine if it does not...
                 if os.path.exists(path) :
                     self.logger.info ('Opening File: %s' % path)
 
-                    # open the file
-                    self.adobe.app.load(self.adobe.File(path))
-
                     context = self.sgtk.context_from_entity(published_files_to_open[path]['entity_type'],published_files_to_open[path]['id'])
                     self.__add_to_context_cache(path, context)
+
+                    # open the file
+                    self.adobe.app.load(self.adobe.File(path))
                     sgtk.platform.change_context(context)
 
                 else :
                     del published_files_to_open[path]
 
-            self._CONTEXT_CHANGES_DISABLED = False
-            self._HEARTBEAT_DISABLED = False
             del os.environ["SHOTGUN_LOAD_FILES_ON_OPEN"]
-
-            # set the current context to the last file opened
-            sgtk.platform.change_context(context)
 
         # if there are no files to open found in the env launch WorkFiles2 'File Open...'
         # this happens in the post_qt_init() for each specific engine
