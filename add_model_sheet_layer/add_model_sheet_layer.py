@@ -66,7 +66,6 @@ def add_model_sheet_layer(engine) :
     
     # disable context switching to speed up file loading
     engine._CONTEXT_CHANGES_DISABLED = True
-    engine._HEARTBEAT_DISABLED = True
     
     for sg_pubfile in sg_pubfiles :
         
@@ -470,7 +469,6 @@ def add_model_sheet_layer(engine) :
     # re-enable context switching
     # not that it matters...
     engine._CONTEXT_CHANGES_DISABLED = False
-    engine._HEARTBEAT_DISABLED = False
 
     # unset all of the environment variables
     os.unsetenv("MODELSHEET_EXPORT_MODE")
