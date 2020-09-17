@@ -47,6 +47,8 @@ def add_model_sheet_layer(engine) :
     show_labels = json.loads(os.environ.get('MODELSHEET_SHOW_LABELS'))
     show_disclaimer = json.loads(os.environ.get('MODELSHEET_SHOW_DISCLAIMER'))
     show_date = json.loads(os.environ.get('MODELSHEET_SHOW_DATE'))
+    create_jpeg = json.loads(os.environ.get('MODELSHEET_CREATE_JPEG'))
+   
     
     # get the sg_pubfile information from the file ids all at once
     selected_filter = [['project','is',engine.context.project]]
@@ -455,6 +457,27 @@ def add_model_sheet_layer(engine) :
 
             file_save = engine.adobe.File(output_path)
             engine.adobe.app.activeDocument.saveAs(file_save, saveOptions ,True)
+
+            # export a jpeg version of the document
+            if create_jpeg :
+            
+                engine.clear_busy()
+                engine.show_busy(
+                    version_name,
+                    "Exporting JPEG... " +
+                    "<br>" 
+                    )
+                
+                export_jpg_path = os.path.splitext(output_path)[0]+".jpg"
+                
+                engine.export_as_jpeg(
+                    document=engine.adobe.app.activeDocument,
+                    output_path=export_jpg_path,
+                    max_size=4096,
+                    quality=12
+                )                
+            
+            # close document
             engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
 
             # open the export folder
