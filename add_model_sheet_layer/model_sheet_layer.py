@@ -9,6 +9,8 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 import sgtk
+import tempfile
+from sys import platform
 
 # standard toolkit logger
 logger = sgtk.platform.get_logger(__name__)
@@ -56,12 +58,21 @@ def model_sheet_layer( engine,
         _2d_label_position = 0.25
         _2d_info_position = 0.40
         _disclaimer_position = 0.68
-    
-    # get the model sheet bg image
+
+    tmp = tempfile.gettempdir()
     script_path = os.path.dirname(os.path.realpath(__file__))
-    model_sheet_bg_path = os.path.join(script_path,'../../resources/model_sheet_bg.png')
-    model_sheet_image_path = '/tmp/sg_modelsheet_images/model_sheet_image.png'
-    model_sheet_studio_image_path = '/tmp/sg_modelsheet_images/studio_image.jpg'
+
+    # get the model sheet bg image
+    if platform == "darwin":
+    # OS X
+        model_sheet_bg_path = os.path.join(script_path,'..','..','resources','model_sheet_bg.png')
+        model_sheet_image_path = os.path.join(tmp,'sg_modelsheet_images','model_sheet_image.png')
+        model_sheet_studio_image_path = os.path.join(tmp,'sg_modelsheet_images','studio_image.jpg')
+    elif platform == "win32":
+    # Windows...
+        model_sheet_bg_path = os.path.join(script_path,'..','..','resources','model_sheet_bg.png')
+        model_sheet_image_path = os.path.join(tmp,'sg_modelsheet_images','model_sheet_image.png')
+        model_sheet_studio_image_path = os.path.join(tmp,'sg_modelsheet_images','studio_image.jpg')
     
     # make File references if image paths exist
     if os.path.exists(model_sheet_bg_path) :
@@ -70,35 +81,35 @@ def model_sheet_layer( engine,
         model_sheet_image_path_file = engine.adobe.File(model_sheet_image_path)
     if os.path.exists(model_sheet_studio_image_path) :
         model_sheet_studio_image_file = engine.adobe.File(model_sheet_studio_image_path)
-    
+
     # get the photoshop application
     app = engine.adobe.app
-    
+
     # get the current active document
     current_active_document = app.activeDocument
-    
+
     # store the current background color and units
     original_bg_color_red = app.backgroundColor.rgb.red
     original_bg_color_green= app.backgroundColor.rgb.green
     original_bg_color_blue = app.backgroundColor.rgb.blue
-    
+
     original_ruler_units = app.preferences.rulerUnits
     original_type_units = app.preferences.typeUnits
-    
+
     # set the units to PIXELS
     app.preferences.rulerUnits = engine.adobe.Units.PIXELS
-    
+
     # store the current height and width of active document for later
     _width = app.activeDocument.width.value
     _height = app.activeDocument.height.value
-    
+
     # pixels per inch
     _baseUnit = app.activeDocument.width.baseUnit.value
-    
+
     _72dpi = 0.0138888888889
     _300dpi = 0.00333333333333
     _72dpi_factor = round(_baseUnit/_72dpi, 3)
-    
+
     # calculate banner dimensions
     _banner_height = int(max(_banner_min_height,_width*_banner_aspect))
     _canvas_height = _height + _banner_height
@@ -116,11 +127,10 @@ def model_sheet_layer( engine,
     except:
         existing_banner = False
         pass
-    
-    
+ 
     # set mode to RGB
     current_active_document.changeMode(engine.adobe.ChangeMode.RGB)
-    
+
     # set the background color
     # this is the color of the modelsheet top banner
     if banner_color in ['Black'] :

@@ -13,6 +13,7 @@ import sgtk
 import json
 import imp
 import subprocess
+import platform
 from datetime import date
 # from datetime import datetime
 # import publish_output
@@ -482,7 +483,14 @@ def add_model_sheet_layer(engine) :
 
             # open the export folder
             if open_export_folder:
-                subprocess.check_call(['open' ,export_folder])
+                if platform == "darwin":
+                # OS X
+                    subprocess.check_call(['open' ,export_folder])
+      
+                elif platform == "win32":
+                # Windows...
+                    subprocess.Popen(r'explorer /select,"'+export_folder+'"')
+
 
     engine.clear_busy()
 
