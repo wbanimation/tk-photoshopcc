@@ -13,6 +13,7 @@ import sgtk
 import json
 import imp
 import subprocess
+import time
 from sys import platform
 from datetime import date
 # from datetime import datetime
@@ -96,6 +97,13 @@ def add_model_sheet_layer(engine) :
         # make sure path exists
         # if it does not, skip for now...
         if not os.path.exists(local_path):
+            engine.show_busy(
+                "WARNING! Published File does not exist..." ,
+                local_path
+                )
+            
+            logger.info('WARNING: Published File does not exist: %s' % local_path)
+            time.sleep(2)
             continue
 
         tk = sgtk.sgtk_from_path(local_path)
