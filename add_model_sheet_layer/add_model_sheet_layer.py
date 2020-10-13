@@ -13,7 +13,7 @@ import sgtk
 import json
 import imp
 import subprocess
-import platform
+from sys import platform
 from datetime import date
 # from datetime import datetime
 # import publish_output
@@ -70,8 +70,8 @@ def add_model_sheet_layer(engine) :
     # disable context switching to speed up file loading
     engine._CONTEXT_CHANGES_DISABLED = True
     
-    for sg_pubfile in sg_pubfiles :
-        
+    while len(sg_pubfiles) >= 1 :
+    
         project_name = ''
         asset_name = ''
         task_name = ''
@@ -83,6 +83,7 @@ def add_model_sheet_layer(engine) :
         sap_number = ''
         assigned_to = ''
     
+        sg_pubfile = sg_pubfiles.pop(0)
         local_path = None
         sg_task = None
         task_assignees = None
@@ -480,16 +481,25 @@ def add_model_sheet_layer(engine) :
             
             # close document
             engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
+        
+        #remove the just processed id from the pubfile id list
+        photoshop_file_ids.remove(int(sg_pubfile['id']))
 
-            # open the export folder
-            if open_export_folder:
-                if platform == "darwin":
-                # OS X
-                    subprocess.check_call(['open' ,export_folder])
-      
-                elif platform == "win32":
-                # Windows...
-                    subprocess.Popen(r'explorer /select,"'+export_folder+'"')
+        # overwrite the MODELSHEET_PUB_FILE_IDS environment variable
+        # minus the most recently processed file
+        # this is so things can pick up where they left off after a crash
+        os.environ["MODELSHEET_PUB_FILE_IDS"] = json.dumps(photoshop_file_ids)
+
+    
+    # open the export folder
+    if open_export_folder:
+        if platform == "darwin":
+        # OS X
+            subprocess.check_call(['open' ,export_folder])
+
+        elif platform == "win32":
+        # Windows...
+            subprocess.Popen(r'explorer /select,"'+export_folder+'"')
 
 
     engine.clear_busy()
