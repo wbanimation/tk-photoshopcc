@@ -13,8 +13,7 @@ import sgtk
 import json
 import imp
 import subprocess
-import time
-from sys import platform
+import platform
 from datetime import date
 # from datetime import datetime
 # import publish_output
@@ -71,8 +70,8 @@ def add_model_sheet_layer(engine) :
     # disable context switching to speed up file loading
     engine._CONTEXT_CHANGES_DISABLED = True
     
-    while len(sg_pubfiles) >= 1 :
-    
+    for sg_pubfile in sg_pubfiles :
+        
         project_name = ''
         asset_name = ''
         task_name = ''
@@ -84,7 +83,6 @@ def add_model_sheet_layer(engine) :
         sap_number = ''
         assigned_to = ''
     
-        sg_pubfile = sg_pubfiles.pop(0)
         local_path = None
         sg_task = None
         task_assignees = None
@@ -97,13 +95,6 @@ def add_model_sheet_layer(engine) :
         # make sure path exists
         # if it does not, skip for now...
         if not os.path.exists(local_path):
-            engine.show_busy(
-                "WARNING! Published File does not exist..." ,
-                local_path
-                )
-            
-            logger.info('WARNING: Published File does not exist: %s' % local_path)
-            time.sleep(2)
             continue
 
         tk = sgtk.sgtk_from_path(local_path)
@@ -258,7 +249,7 @@ def add_model_sheet_layer(engine) :
             
             engine.clear_busy()
             engine.show_busy(
-                publish_name,
+                version_name,
                 "Creating Thumbnail...<br>" 
                 )
 
@@ -280,13 +271,25 @@ def add_model_sheet_layer(engine) :
             else :
                 sg_task = engine.context.task
 
-            # create a version
+            # create a new version name
+            # sure there is a better way to do this...
+            
+            # first remove the old version Token
+            version_name_split = version_name.split('_')
+            version_name_split.pop()
+            version_name = '_'.join(version_name_split)
+
+            publish_version_name_split = publish_version_name.split('_')
+            publish_version_name_split.pop()
+            publish_version_name = '_'.join(publish_version_name_split)
+            
+            # next add the new version number
             version_name = ('%s_v%s' % (publish_version_name,str(version_number).zfill(2)))
             upload_path = publish_path
             path_to_movie = None
             path_to_frames = publish_path
             version_desrciption = 'Updated Model Sheet...'    
-            
+
             engine.clear_busy()
             engine.show_busy(
                 version_name,
@@ -310,7 +313,7 @@ def add_model_sheet_layer(engine) :
                 "project": engine.context.project,
                 "code": version_name,
                 "description": version_desrciption,
-                "entity": engine.context.entity,
+                "entity": context.entity,
                 "sg_task": sg_task,
                 "sg_path_to_frames": path_to_frames,
                 "sg_path_to_movie": path_to_movie,
@@ -489,25 +492,16 @@ def add_model_sheet_layer(engine) :
             
             # close document
             engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
-        
-        #remove the just processed id from the pubfile id list
-        photoshop_file_ids.remove(int(sg_pubfile['id']))
 
-        # overwrite the MODELSHEET_PUB_FILE_IDS environment variable
-        # minus the most recently processed file
-        # this is so things can pick up where they left off after a crash
-        os.environ["MODELSHEET_PUB_FILE_IDS"] = json.dumps(photoshop_file_ids)
-
-    
-    # open the export folder
-    if open_export_folder:
-        if platform == "darwin":
-        # OS X
-            subprocess.check_call(['open' ,export_folder])
-
-        elif platform == "win32":
-        # Windows...
-            subprocess.Popen(r'explorer /select,"'+export_folder+'"')
+            # open the export folder
+            if open_export_folder:
+                if platform == "darwin":
+                # OS X
+                    subprocess.check_call(['open' ,export_folder])
+      
+                elif platform == "win32":
+                # Windows...
+                    subprocess.Popen(r'explorer /select,"'+export_folder+'"')
 
 
     engine.clear_busy()
@@ -589,7 +583,10 @@ def get_next_version_number(tk, template, fields):
         versions.append(path_fields["version"])
     
     # find the highest version in the list and add one.
-    return max(versions) + 1
+    if len(versions) == 0 :
+        return  1
+    else:
+        return max(versions) + 1
 
 
 def _get_version_name_from_filename(filename):
