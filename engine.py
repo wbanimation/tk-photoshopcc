@@ -1,11 +1,11 @@
 # Copyright (c) 2019 Shotgun Software Inc.
-# 
+#
 # CONFIDENTIAL AND PROPRIETARY
-# 
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit 
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
-# By accessing, using, copying or modifying this work you indicate your 
-# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights 
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 import logging
 import os
@@ -384,7 +384,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
     def export_as_jpeg(self, document=None, output_path=None, max_size=2048, quality=12):
         """
         Export a Jpeg image from the given document or from the current document.
-        
+
         :param document: The document to generate a thumbnail for. Assumes the
                          active document if ``None`` is supplied.
         :param output_path: The output file path to write the thumbnail. If
@@ -427,13 +427,13 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 orig_name = active_doc.name
                 width_str = str(active_doc.width.value)
                 height_str = str(active_doc.height.value)
-                
+
                 # Get a temp document name so we can manipulate the document without
                 # affecting the original docuement.
                 name, sfx = os.path.splitext(orig_name)
                 # a "." is included in the extension returned by splitext
                 jpeg_name = "%s_tkjpeg%s" % (name, sfx)
-                
+
                 # Find the doc size in pixels
                 # Note: this doesn't handle measurements other than pixels.
                 doc_width = doc_height = 0
@@ -446,7 +446,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 mo = exp.match(height_str)
                 if mo:
                     doc_height = int(mo.group("value"))
-        
+
                 jpeg_width = jpeg_height = 0
                 if doc_width and doc_height:
                     max_sz = max(doc_width, doc_height)
@@ -466,9 +466,9 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 jpeg_options.quality = quality
 
                 # duplicate the original doc:
-                save_options = adobe.SaveOptions.DONOTSAVECHANGES     
+                save_options = adobe.SaveOptions.DONOTSAVECHANGES
                 jpeg_doc = active_doc.duplicate(jpeg_name)
-        
+
                 try:
                     # Flatten image:
                     jpeg_doc.flatten()
@@ -482,7 +482,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                         )
                     # Save:
                     jpeg_doc.saveAs(jpeg_file, jpeg_options, True)
-        
+
                 finally:
                     # Close the doc:
                     jpeg_doc.close(save_options)
@@ -497,10 +497,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
     def add_to_context_cache(self, path, context) :
         """
         Add a path:context entry to the _CONTEXT_CACHE.
-        
+
         :param path: The path of the active document.
         :param context: The current context form the document.
-        """        
+        """
         self.__add_to_context_cache(path, context)
 
     def add_model_sheet_layer(self,
@@ -523,13 +523,13 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                                 show_disclaimer) :
         """
         Create a New Layer in the current Document.
-        
+
         :param project_name: The path of the active document.
         :param project_type: Project Type 2D/3D.
-        """       
-        
+        """
+
         model_sheet_layer = imp.load_source('model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','model_sheet_layer.py'))
-        
+
         # add the model sheet layer
         model_sheet_layer.model_sheet_layer(
                                 self,
@@ -616,7 +616,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
             # make the document being processed the active document
             self.adobe.app.activeDocument = document
-        
+
             (_, ext) = os.path.splitext(path)
             ext = ext.lower()
 
@@ -626,7 +626,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 # restore the active document
                 self.adobe.app.activeDocument = previous_active_document
                 return
-            
+
             # the following extensions follow the same pattern of defining options
             # that will be supplied to the document's saveAs method
             if ext == ".bmp":
@@ -712,9 +712,9 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
     def host_info(self):
         """
         Returns information about the application hosting this engine.
-        
+
         :returns: A {"name": application name, "version": application version}
-                  dictionary. 
+                  dictionary.
         """
         if not self.adobe:
             # Don't error out if the bridge was not yet started
@@ -1261,7 +1261,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
             self.__tk_photoshopcc.win_32_api.SetWindowLong(
                 proxy_win_hwnd,
-                self.__tk_photoshopcc.win_32_api.GWL_EXSTYLE, 
+                self.__tk_photoshopcc.win_32_api.GWL_EXSTYLE,
                 win_ex_style | self.__tk_photoshopcc.win_32_api.WS_EX_NOPARENTNOTIFY,
             )
             self.__tk_photoshopcc.win_32_api.SetParent(proxy_win_hwnd, ps_hwnd)
@@ -1290,7 +1290,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 self._DIALOG_PARENT = self._win32_get_proxy_window()
             else:
                 self._DIALOG_PARENT = QtGui.QApplication.activeWindow()
-            
+
         return self._DIALOG_PARENT
 
     def show_dialog(self, title, bundle, widget_class, *args, **kwargs):
@@ -1702,7 +1702,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # scope would be unusable, as we don't allow context changing across
             # project boundaries.
             self._CONTEXT_CACHE[path] = context
-            
+
             self.logger.info("Storing context cache1: %s" % context)
 
             serial_cache = dict()
@@ -1722,8 +1722,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         :returns: Context object, or None
         """
-        self.logger.error("===== _CONTEXT_CACHE: %s" % (self._CONTEXT_CACHE,))
-        
+        self.logger.info("===== _CONTEXT_CACHE: %s" % (self._CONTEXT_CACHE,))
+
         return self._CONTEXT_CACHE.get(path)
 
     def __request_context_display(self, entity):
