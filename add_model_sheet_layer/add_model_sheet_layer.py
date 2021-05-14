@@ -1,14 +1,14 @@
 # Copyright (c) 2013 Shotgun Software Inc.
-# 
+#
 # CONFIDENTIAL AND PROPRIETARY
-# 
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit 
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
-# By accessing, using, copying or modifying this work you indicate your 
-# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights 
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
-import os 
+import os
 import sgtk
 import json
 import imp
@@ -28,7 +28,7 @@ model_sheet_layer = imp.load_source('model_sheet_layer', os.path.join(os.path.di
 today = date.today()
 
 def add_model_sheet_layer(engine) :
-    
+
     # grab all the environment variables that were set for us
     mode = json.loads(os.environ.get('MODELSHEET_EXPORT_MODE'))
     version_playlist_mode = json.loads(os.environ.get('MODELSHEET_VERSION_PLAYLIST_MODE'))
@@ -49,8 +49,8 @@ def add_model_sheet_layer(engine) :
     show_disclaimer = json.loads(os.environ.get('MODELSHEET_SHOW_DISCLAIMER'))
     show_date = json.loads(os.environ.get('MODELSHEET_SHOW_DATE'))
     create_jpeg = json.loads(os.environ.get('MODELSHEET_CREATE_JPEG'))
-   
-    
+    logo_image_path = json.loads(os.environ.get('MODELSHEET_LOGO_IMAGE_PATH'))
+
     # get the sg_pubfile information from the file ids all at once
     selected_filter = [['project','is',engine.context.project]]
     fields = ['name','path','task','entity','version','version.Version.sg_status_list','version.Version.entity','version.Version.playlists','project.Project.tank_name',
@@ -61,17 +61,17 @@ def add_model_sheet_layer(engine) :
         pubfiles_filter.append(pubfile_filter)
     selected_filter.append({"filter_operator": "any", "filters": pubfiles_filter })
     sg_pubfiles = engine.shotgun.find("PublishedFile",selected_filter,fields)
-    
+
     # go through published files that were passed from Shotgun
     # first we need to get information from the published files
     # then we need to look up some additional information based on the published file information
     # now open up each file and add the model sheet information
-    
+
     # disable context switching to speed up file loading
     engine._CONTEXT_CHANGES_DISABLED = True
-    
+
     for sg_pubfile in sg_pubfiles :
-        
+
         project_name = ''
         asset_name = ''
         task_name = ''
@@ -82,16 +82,16 @@ def add_model_sheet_layer(engine) :
         current_sc = ''
         sap_number = ''
         assigned_to = ''
-    
+
         local_path = None
         sg_task = None
         task_assignees = None
-        
-        
+
+
         # get the path to the photoshop file
         if sg_pubfile['path']['local_path']:
             local_path = sg_pubfile['path']['local_path']
-        
+
         # make sure path exists
         # if it does not, skip for now...
         if not os.path.exists(local_path):
@@ -110,7 +110,7 @@ def add_model_sheet_layer(engine) :
                 task_name = context.task['name']
         else :
             task_name = ""
-        
+
         # get entity from published file context
         if context.entity != None :
             if 'name' in context.entity:
@@ -168,7 +168,7 @@ def add_model_sheet_layer(engine) :
         engine.show_busy(
             version_name,
             "Opening Version... " +
-            "<br>" 
+            "<br>"
             )
 
         # open the photshop file
@@ -181,7 +181,7 @@ def add_model_sheet_layer(engine) :
             engine.show_busy(
                 version_name,
                 "Finding Next Version to Publish..." +
-                "<br>" 
+                "<br>"
                 )
 
             # need to get the correct output folder for the new Published File
@@ -204,7 +204,7 @@ def add_model_sheet_layer(engine) :
 
             # use the highest pub file or work file version number
             fields["version"] = max(highest_pubfile_version_number,highest_work_version_number)
-            
+
             # keep track of the original extension for later...
             original_extension = fields['extension']
 
@@ -219,7 +219,7 @@ def add_model_sheet_layer(engine) :
             engine.show_busy(
                 version_name,
                 "Adding Model Sheet..." +
-                "<br>" 
+                "<br>"
                 )
 
             # add the model sheet layer
@@ -238,6 +238,7 @@ def add_model_sheet_layer(engine) :
                                     assigned_to,
                                     banner_color,
                                     font,
+                                    logo_image_path,
                                     show_logo,
                                     show_labels,
                                     show_date,
@@ -246,11 +247,11 @@ def add_model_sheet_layer(engine) :
 
             # save new published file
             engine.save_to_path(engine.adobe.app.activeDocument, publish_path)
-            
+
             engine.clear_busy()
             engine.show_busy(
                 version_name,
-                "Creating Thumbnail...<br>" 
+                "Creating Thumbnail...<br>"
                 )
 
             # make the thumbnail
@@ -273,7 +274,7 @@ def add_model_sheet_layer(engine) :
 
             # create a new version name
             # sure there is a better way to do this...
-            
+
             # first remove the old version Token
             version_name_split = version_name.split('_')
             version_name_split.pop()
@@ -282,18 +283,18 @@ def add_model_sheet_layer(engine) :
             publish_version_name_split = publish_version_name.split('_')
             publish_version_name_split.pop()
             publish_version_name = '_'.join(publish_version_name_split)
-            
+
             # next add the new version number
             version_name = ('%s_v%s' % (publish_version_name,str(version_number).zfill(2)))
             upload_path = publish_path
             path_to_movie = None
             path_to_frames = publish_path
-            version_desrciption = 'Updated Model Sheet...'    
+            version_desrciption = 'Updated Model Sheet...'
 
             engine.clear_busy()
             engine.show_busy(
                 version_name,
-                "Creating Version...<br>" 
+                "Creating Version...<br>"
                 )
 
             # set the version playlists
@@ -329,7 +330,7 @@ def add_model_sheet_layer(engine) :
             engine.clear_busy()
             engine.show_busy(
                 publish_name,
-                "Creating Published File...<br>" 
+                "Creating Published File...<br>"
                 )
 
             # register the publish
@@ -357,7 +358,7 @@ def add_model_sheet_layer(engine) :
                 engine.clear_busy()
                 engine.show_busy(
                     publish_jpg_name,
-                    "Creating JPG Published File...<br>" 
+                    "Creating JPG Published File...<br>"
                     )
 
                 engine.export_as_jpeg(
@@ -386,7 +387,7 @@ def add_model_sheet_layer(engine) :
             engine.clear_busy()
             engine.show_busy(
                 version_name,
-                "Uploading Version Media...<br>" 
+                "Uploading Version Media...<br>"
                     )
 
             # upload the file to SG
@@ -403,7 +404,7 @@ def add_model_sheet_layer(engine) :
                 filters = [['project','is',context.project],['note_links','in',sg_pubfile['version']]]
                 fields = ['note_links']
                 sg_notes = engine.shotgun.find('Note',filters,fields)
-                
+
                 for note in sg_notes :
                     note_links = note['note_links']
                     note_links.append(sg_version)
@@ -418,7 +419,7 @@ def add_model_sheet_layer(engine) :
             engine.show_busy(
                 version_name,
                 "Adding Model Sheet..." +
-                "<br>" 
+                "<br>"
                 )
 
             # add the model sheet layer
@@ -437,6 +438,7 @@ def add_model_sheet_layer(engine) :
                                     assigned_to,
                                     banner_color,
                                     font,
+                                    logo_image_path,
                                     show_logo,
                                     show_labels,
                                     show_date,
@@ -446,12 +448,12 @@ def add_model_sheet_layer(engine) :
             # get the output name from the local_path
             output_filename, extension = _get_output_filename(local_path, filename_prefix, filename_suffix, current_sc, ship_episode)
             output_path = os.path.join(export_folder,output_filename)
-            
+
             engine.clear_busy()
             engine.show_busy(
                 version_name,
                 "Exporting Photshop Document... " +
-                "<br>" 
+                "<br>"
                 )
 
             # make sure directory exists
@@ -473,23 +475,23 @@ def add_model_sheet_layer(engine) :
 
             # export a jpeg version of the document
             if create_jpeg :
-            
+
                 engine.clear_busy()
                 engine.show_busy(
                     version_name,
                     "Exporting JPEG... " +
-                    "<br>" 
+                    "<br>"
                     )
-                
+
                 export_jpg_path = os.path.splitext(output_path)[0]+".jpg"
-                
+
                 engine.export_as_jpeg(
                     document=engine.adobe.app.activeDocument,
                     output_path=export_jpg_path,
                     max_size=4096,
                     quality=12
-                )                
-            
+                )
+
             # close document
             engine.adobe.app.activeDocument.close(engine.adobe.SaveOptions.DONOTSAVECHANGES)
 
@@ -498,7 +500,7 @@ def add_model_sheet_layer(engine) :
                 if platform == "darwin":
                 # OS X
                     subprocess.check_call(['open' ,export_folder])
-      
+
                 elif platform == "win32":
                 # Windows...
                     subprocess.Popen(r'explorer /select,"'+export_folder+'"')
@@ -532,34 +534,35 @@ def add_model_sheet_layer(engine) :
     os.unsetenv("MODELSHEET_SHOW_LABELS")
     os.unsetenv("MODELSHEET_SHOW_DISCLAIMER")
     os.unsetenv("MODELSHEET_SHOW_DATE")
+    os.unsetenv("MODELSHEET_LOGO_IMAGE_PATH")
 
 
 def create_playlist(engine, playlist_name):
-        
+
         playlist_type =  "Design"
         description = "Updated Model Sheets."
-        
+
         filter = [['code','is',playlist_name]]
         sg_playlist = engine.shotgun.find_one('Playlist',filter,['versions'])
-        
+
         if sg_playlist == None :
-            
+
             engine.show_busy(
                 "Creating Playlist...",
                 playlist_name +
-                "<br>" 
+                "<br>"
                     )
-            
+
             data = {'project': engine.context.project, 'code' : playlist_name, 'sg_type': playlist_type, 'description':description}
             sg_playlist = engine.shotgun.create('Playlist',data)
         else:
-            
+
             engine.show_busy(
                 "Using Existing Playlist...",
                 playlist_name +
-                "<br>" 
+                "<br>"
                     )
-        
+
         return [sg_playlist]
 
 
@@ -581,7 +584,7 @@ def get_next_version_number(tk, template, fields):
         # extract the values from the path so we can read the version.
         path_fields = template.get_fields(a_file)
         versions.append(path_fields["version"])
-    
+
     # find the highest version in the list and add one.
     if len(versions) == 0 :
         return  1
@@ -590,7 +593,7 @@ def get_next_version_number(tk, template, fields):
 
 
 def _get_version_name_from_filename(filename):
-    
+
     try :
         version_name,extension = filename.rsplit('.')
         return version_name
@@ -599,12 +602,12 @@ def _get_version_name_from_filename(filename):
 
 
 def _get_version_name_from_path(path):
-    
+
     try :
         filename = path.rsplit(os.sep,1)[1]
     except :
         filename = path
-    
+
     try :
         version_name = filename.rsplit('.')[0]
         return version_name
@@ -613,19 +616,19 @@ def _get_version_name_from_path(path):
 
 
 def _get_output_filename(local_path, filename_prefix, filename_suffix, current_sc, ship_episode):
-    
+
     extension = None
-    
+
     try :
         input_path,output_filename = local_path.rsplit(os.sep,1)
     except :
         output_filename = local_path
-    
+
     try :
         output_basename,extension = output_filename.rsplit('.',1)
     except :
         output_basename = output_filename
-    
+
     # add the filename prefix and suffix
     if filename_prefix != 'None' :
         if filename_prefix == 'Current Scene' :
@@ -634,15 +637,15 @@ def _get_output_filename(local_path, filename_prefix, filename_suffix, current_s
             filename_prefix = ship_episode
         if filename_prefix != '' :
             output_basename = filename_prefix+'_'+output_basename
-        
+
     if filename_suffix != 'None' :
         if filename_suffix == 'YYYYMMDD' :
             filename_suffix = str(today.strftime('%Y%m%d'))
         output_basename = output_basename+'_'+filename_suffix
-    
+
     if extension != None :
         output_filename = output_basename+'.'+extension
     else :
         output_filename = output_basename
-    
+
     return output_filename, extension
