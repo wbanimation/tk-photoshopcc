@@ -15,10 +15,10 @@ import tempfile
 import threading
 import uuid
 import re
-
+import imp
+import json
 
 from contextlib import contextmanager
-
 
 import sgtk
 from sgtk.util.filesystem import ensure_folder_exists
@@ -293,11 +293,74 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         # Since this is running in our own Qt event loop, we'll use the bundled
         # dark look and feel. breaking encapsulation to do so.
-        self.logger.debug("Initializing default styling...")
+        self.logger.info("Initializing default styling...")
         self._initialize_dark_look_and_feel()
 
         # Sets up the heartbeat timer to run asynchronously.
         self.__setup_connection_timer(force=True)
+
+        # Normally the bootstrap logic would handle the file open, but since the bootstrap logic is handled by
+        # the adobe framework, and is generic, we should handle it here.
+        file_to_open = os.environ.get("SGTK_FILE_TO_OPEN")
+
+        if "MODELSHEET_PUB_FILE_IDS" in os.environ:
+
+            self.logger.info ('CC engine: Launching Add Model Sheet... ')
+
+            # load the model sheet module
+            add_model_sheet_layer = imp.load_source('add_model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','add_model_sheet_layer.py'))
+            self.logger.info("imported add_model_sheet_layer: %s" % add_model_sheet_layer)
+            add_model_sheet_layer.add_model_sheet_layer(self)
+        elif "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
+
+            self.logger.info ('Preparing To Load Files... ')
+
+            # grab the environment variables that were set for us
+            published_files_to_open = json.loads(os.environ.get('SHOTGUN_LOAD_FILES_ON_OPEN'))
+
+            for path in published_files_to_open.keys() :
+                # double check that the file exists. it will crash engine if it does not...
+                if os.path.exists(path) :
+                    self.logger.info ('Opening File: %s' % path)
+
+                    context = self.sgtk.context_from_entity(published_files_to_open[path]['entity_type'],published_files_to_open[path]['id'])
+                    self.__add_to_context_cache(path, context)
+
+                    # open the file
+                    self.adobe.app.load(self.adobe.File(path))
+                    sgtk.platform.change_context(context)
+
+                else :
+                    del published_files_to_open[path]
+
+            del os.environ["SHOTGUN_LOAD_FILES_ON_OPEN"]
+
+        # if there are no files to open found in the env launch WorkFiles2 'File Open...'
+        # this happens in the post_qt_init() for each specific engine
+        if file_to_open:
+            self.logger.info ('Opening File: %s' % file_to_open)
+            # open the specified file
+            self.adobe.app.open(self.adobe.File(file_to_open))
+            # clear the environment variable after loading so that it doesn't get reopened on an engine restart.
+            del os.environ["SGTK_FILE_TO_OPEN"]
+        else:
+            # If there is no file_to_open show WorkFiles 'File Open...'
+            if len(list(self.adobe.app.documents)) == 0:
+
+                # launch Task Buddy if available...
+#                 if 'Task Buddy...' in self.commands :
+#                     self.logger.info ('Opening Task Buddy...')
+#                     uid = self.commands['Task Buddy...']['properties']['uid']
+#                     self.logger.info ('   uid: %s' % uid)
+#                     self._handle_command(uid)
+
+                # if not, check for the File Open command and launch it...
+#                 elif 'File Open...' in self.commands :
+                if 'File Open...' in self.commands :
+                    self.logger.info ('Opening WorkFiles2...')
+                    uid = self.commands['File Open...']['properties']['uid']
+                    self.logger.info ('   uid: %s' % uid)
+                    self._handle_command(uid)
 
     def register_command(self, name, callback, properties=None):
         """
@@ -424,6 +487,65 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 # Set dialog mode back to original.
                 adobe.app.displayDialogs = original_dialog_mode
         return jpeg_pub_path
+
+    def add_to_context_cache(self, path, context) :
+        """
+        Add a path:context entry to the _CONTEXT_CACHE.
+
+        :param path: The path of the active document.
+        :param context: The current context form the document.
+        """
+        self.__add_to_context_cache(path, context)
+
+    def add_model_sheet_layer(self,
+                                project_name,
+                                project_type,
+                                asset_name,
+                                task_name,
+                                version_name,
+                                asset_type,
+                                episode_name,
+                                ship_episode,
+                                current_sc,
+                                sap_number,
+                                assigned_to,
+                                banner_color,
+                                font,
+                                show_logo,
+                                show_labels,
+                                show_date,
+                                show_disclaimer) :
+        """
+        Create a New Layer in the current Document.
+
+        :param project_name: The path of the active document.
+        :param project_type: Project Type 2D/3D.
+        """
+
+        model_sheet_layer = imp.load_source('model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','model_sheet_layer.py'))
+
+        # add the model sheet layer
+        model_sheet_layer.model_sheet_layer(
+                                self,
+                                project_name,
+                                project_type,
+                                asset_name,
+                                task_name,
+                                version_name,
+                                asset_type,
+                                episode_name,
+                                ship_episode,
+                                current_sc,
+                                sap_number,
+                                assigned_to,
+                                banner_color,
+                                font,
+                                show_logo,
+                                show_labels,
+                                show_date,
+                                show_disclaimer
+                                )
+
 
     def generate_thumbnail(self, document=None, output_path=None):
         """
@@ -1558,6 +1680,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # project boundaries.
             self._CONTEXT_CACHE[path] = context
 
+            self.logger.info("Storing context cache1: %s" % context)
+
             serial_cache = dict()
             for k, v in self._CONTEXT_CACHE.items():
                 serial_cache[k] = v.serialize()
@@ -1575,6 +1699,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         :returns: Context object, or None
         """
+        self.logger.info("===== _CONTEXT_CACHE: %s" % (self._CONTEXT_CACHE,))
+
         return self._CONTEXT_CACHE.get(path)
 
     def __request_context_display(self, entity):

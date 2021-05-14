@@ -105,7 +105,9 @@ class PhotoshopCCSceneCollector(HookBaseClass):
             if not document:
                 return
             document_item = parent_item.create_item(
-                "photoshop.document", "Photoshop Image", document.name
+                "photoshop.document",
+                "Photoshop2 Image",
+                document.name
             )
             self.logger.info("Collected Photoshop document: %s" % (document.name))
             document_item.set_icon_from_path(icon_path)
@@ -132,7 +134,9 @@ class PhotoshopCCSceneCollector(HookBaseClass):
 
             # create a publish item for the document
             document_item = parent_item.create_item(
-                "photoshop.document", "Photoshop Image", document.name
+                "photoshop.document",
+                "Photoshop3 Image",
+                document.name
             )
 
             document_item.set_icon_from_path(icon_path)
