@@ -311,12 +311,12 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         if "MODELSHEET_PUB_FILE_IDS" in os.environ:
 
-            self.logger.info ('Launching Add Model Sheet... ')
+            self.logger.info ('CC engine: Launching Add Model Sheet... ')
 
             # load the model sheet module
             add_model_sheet_layer = imp.load_source('add_model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','add_model_sheet_layer.py'))
+            self.logger.info("imported add_model_sheet_layer: %s" % add_model_sheet_layer)
             add_model_sheet_layer.add_model_sheet_layer(self)
-
         elif "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
 
             self.logger.info ('Preparing To Load Files... ')
