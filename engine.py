@@ -1167,7 +1167,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
             # Create the proxy QWidget.
             win32_proxy_win = QtGui.QWidget()
-            window_title = "Shotgun Toolkit Parent Widget"
+            window_title = "SG Toolkit Parent Widget"
             win32_proxy_win.setWindowTitle(window_title)
 
             # We have to take different approaches depending on whether
@@ -1736,9 +1736,9 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 There was an error retrieving fields for this context. Please
                 see the logs for the specific error message. If this is a
                 recurring error and you need further assistance, please
-                send an email to <a href='mailto:support@shotgunsoftware.com'>
-                support@shotgunsoftware.com</a>.
-                """
+                contact our support team via {}.""".format(
+                    sgtk.support_url
+                )
             )
             self.logger.error("Failed to query context fields: %s" % (msg,))
 
