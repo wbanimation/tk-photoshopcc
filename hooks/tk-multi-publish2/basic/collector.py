@@ -41,8 +41,7 @@ class PhotoshopCCSceneCollector(HookBaseClass):
         """
 
         # grab any base class settings
-        collector_settings = \
-            super(PhotoshopCCSceneCollector, self).settings or {}
+        collector_settings = super(PhotoshopCCSceneCollector, self).settings or {}
 
         # settings specific to this collector
         photoshop_session_settings = {
@@ -50,10 +49,10 @@ class PhotoshopCCSceneCollector(HookBaseClass):
                 "type": "template",
                 "default": None,
                 "description": "Template path for artist work files. Should "
-                               "correspond to a template defined in "
-                               "templates.yml. If configured, is made available"
-                               "to publish plugins via the collected item's "
-                               "properties. ",
+                "correspond to a template defined in "
+                "templates.yml. If configured, is made available"
+                "to publish plugins via the collected item's "
+                "properties. ",
             },
         }
 
@@ -73,10 +72,7 @@ class PhotoshopCCSceneCollector(HookBaseClass):
 
         # go ahead and build the path to the icon for use by any documents
         icon_path = os.path.join(
-            self.disk_location,
-            os.pardir,
-            "icons",
-            "photoshop.png"
+            self.disk_location, os.pardir, "icons", "photoshop.png"
         )
 
         publisher = self.parent
@@ -89,13 +85,14 @@ class PhotoshopCCSceneCollector(HookBaseClass):
             engine.logger.debug("No active document found.")
             active_doc_name = None
 
-        # attempt to retrive a configured work template. we can attach
-        # it to the collected project items
+        # Attempt to retrieve a configured work template. We can attach
+        # it to the collected project items.
         work_template_setting = settings.get("Work Template")
         work_template = None
         if work_template_setting:
             work_template = publisher.engine.get_template_by_name(
-                work_template_setting.value)
+                work_template_setting.value
+            )
 
         # FIXME: begin temporary workaround
         # we use different logic here only because we don't have proper support
@@ -112,8 +109,7 @@ class PhotoshopCCSceneCollector(HookBaseClass):
                 "Photoshop2 Image",
                 document.name
             )
-            self.logger.info(
-                "Collected Photoshop document: %s" % (document.name))
+            self.logger.info("Collected Photoshop document: %s" % (document.name))
             document_item.set_icon_from_path(icon_path)
             document_item.thumbnail_enabled = False
             document_item.properties["document"] = document
@@ -145,9 +141,9 @@ class PhotoshopCCSceneCollector(HookBaseClass):
 
             document_item.set_icon_from_path(icon_path)
 
-            # disable thumbnail creation for photoshop documents. for the
+            # Disable thumbnail creation for Photoshop documents. For the
             # default workflow, the thumbnail will be auto-updated after the
-            # version creation plugin runs
+            # version creation plugin runs.
             document_item.thumbnail_enabled = False
 
             # add the document object to the properties so that the publish
@@ -182,8 +178,7 @@ class PhotoshopCCSceneCollector(HookBaseClass):
             # execution time.
             if work_template:
                 document_item.properties["work_template"] = work_template
-                self.logger.debug(
-                    "Work template defined for Photoshop collection.")
+                self.logger.debug("Work template defined for Photoshop collection.")
 
         # reset the original document to restore the state for the user
         engine.adobe.app.activeDocument = current_document

@@ -22,6 +22,7 @@ from contextlib import contextmanager
 
 import sgtk
 from sgtk.util.filesystem import ensure_folder_exists
+from tank_vendor import six
 
 
 class PhotoshopCCEngine(sgtk.platform.Engine):
@@ -39,21 +40,15 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
     # https://support.shotgunsoftware.com/hc/en-us/articles/219039748-Photoshop#If%20the%20engine%20does%20not%20start
     SHOTGUN_ADOBE_HEARTBEAT_INTERVAL = os.environ.get(
         "SHOTGUN_ADOBE_HEARTBEAT_INTERVAL",
-        os.environ.get(
-            "SGTK_PHOTOSHOP_HEARTBEAT_INTERVAL",
-            1.0,
-        )
+        os.environ.get("SGTK_PHOTOSHOP_HEARTBEAT_INTERVAL", 1.0,),
     )
     SHOTGUN_ADOBE_HEARTBEAT_TOLERANCE = os.environ.get(
         "SHOTGUN_ADOBE_HEARTBEAT_TOLERANCE",
-        os.environ.get(
-            "SGTK_PHOTOSHOP_HEARTBEAT_TOLERANCE",
-            2,
-        ),
+        os.environ.get("SGTK_PHOTOSHOP_HEARTBEAT_TOLERANCE", 2,),
     )
     SHOTGUN_ADOBE_NETWORK_DEBUG = (
-        "SGTK_PHOTOSHOP_NETWORK_DEBUG" in os.environ or
-        "SHOTGUN_ADOBE_NETWORK_DEBUG" in os.environ
+        "SGTK_PHOTOSHOP_NETWORK_DEBUG" in os.environ
+        or "SHOTGUN_ADOBE_NETWORK_DEBUG" in os.environ
     )
 
     TEST_SCRIPT_BASENAME = "run_tests.py"
@@ -111,8 +106,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # will run the callback immediately if already cached so this is likely
         # very quick.
         self.__shotgun_globals.run_on_schema_loaded(
-            _on_schema_loaded,
-            project_id=project_id
+            _on_schema_loaded, project_id=project_id
         )
 
         # go ahead and start the process of sending the current state back to js
@@ -152,8 +146,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             network_debug=self.SHOTGUN_ADOBE_NETWORK_DEBUG,
         )
 
-        self.logger.debug(
-            "Network debug logging is %s" % self._adobe.network_debug)
+        self.logger.debug("Network debug logging is %s" % self._adobe.network_debug)
 
         self.logger.debug("%s: Initializing..." % (self,))
 
@@ -207,6 +200,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         if not self.adobe.event_processor:
             try:
                 from sgtk.platform.qt import QtGui
+
                 self.adobe.event_processor = QtGui.QApplication.processEvents
             except ImportError:
                 pass
@@ -229,12 +223,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             self.logger.debug("Multiple documents found, loading stored context cache.")
 
             serial_cache = self.__settings_manager.retrieve(
-                self._CONTEXT_CACHE_KEY,
-                dict(),
-                self.__settings_manager.SCOPE_PROJECT,
+                self._CONTEXT_CACHE_KEY, dict(), self.__settings_manager.SCOPE_PROJECT,
             )
 
-            for key, value in serial_cache.iteritems():
+            for key, value in serial_cache.items():
                 self._CONTEXT_CACHE[key] = sgtk.Context.deserialize(value)
         else:
             # If there are fewer than 2 documents open, we don't need the stored
@@ -244,8 +236,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             self.logger.debug("Single document found, clearing stored context cache.")
 
             self.__settings_manager.store(
-                self._CONTEXT_CACHE_KEY,
-                dict(),
+                self._CONTEXT_CACHE_KEY, dict(),
             )
 
     def destroy_engine(self):
@@ -283,7 +274,9 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # from the adobe bridge.
         self.adobe.logging_received.disconnect(self._handle_logging)
         self.adobe.command_received.disconnect(self._handle_command)
-        self.adobe.active_document_changed.disconnect(self._handle_active_document_change)
+        self.adobe.active_document_changed.disconnect(
+            self._handle_active_document_change
+        )
         self.adobe.run_tests_request_received.disconnect(self._run_tests)
         self.adobe.state_requested.disconnect(self.__send_state)
 
@@ -295,6 +288,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # We need to have the RPC API call processEvents during its response
         # wait loop. This will keep that loop from blocking the UI thread.
         from sgtk.platform.qt import QtGui
+
         self.adobe.event_processor = QtGui.QApplication.processEvents
 
         # Since this is running in our own Qt event loop, we'll use the bundled
@@ -309,15 +303,36 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # the adobe framework, and is generic, we should handle it here.
         file_to_open = os.environ.get("SGTK_FILE_TO_OPEN")
 
+        # Launch the add_model_sheet app and run it. Processes PublishedFile ids
+        # stored in an environment variable. This works the same way as if it was
+        # running in engine_init.
+        #
+        # We run it here seemingly just so we can use the show_busy() modal. It
+        # can't be used when running from engine_init because there's no QApplication
+        # available yet.
+        # See https://community.shotgunsoftware.com/t/issue-commands-to-an-engine/3557/7
         if "MODELSHEET_PUB_FILE_IDS" in os.environ:
+            # run the add_model_sheet app action.
+            self.logger.info(
+                "MODELSHEET_PUB_FILE_IDS env var set. Launching tk-multi-addmodelsheet"
+            )
+            modelsheet_app = self.apps.get("tk-multi-addmodelsheet")
+            if modelsheet_app is None:
+                self.logger.error(
+                    "Unable to run tk-multi-addmodelsheet. The app is not enabled."
+                )
+            else:
+                with self.context_changes_disabled():
+                    try:
+                        modelsheet_app.add_layer_from_env()
+                    except Exception as e:
+                        self.logger.exception(e)
+                        # if we run into an error, let's show it to the user in Photoshop
+                        self.adobe.rpc_eval("alert(\"%s\");" % e)
+                    finally:
+                        self.clear_busy()
 
-            self.logger.info ('CC engine: Launching Add Model Sheet... ')
-
-            # load the model sheet module
-            add_model_sheet_layer = imp.load_source('add_model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','add_model_sheet_layer.py'))
-            self.logger.info("imported add_model_sheet_layer: %s" % add_model_sheet_layer)
-            add_model_sheet_layer.add_model_sheet_layer(self)
-        elif "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
+        if "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
 
             self.logger.info ('Preparing To Load Files... ')
 
@@ -376,12 +391,12 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         properties = properties or dict()
         properties["uid"] = self.__get_command_uid()
         return super(PhotoshopCCEngine, self).register_command(
-            name,
-            callback,
-            properties,
+            name, callback, properties,
         )
 
-    def export_as_jpeg(self, document=None, output_path=None, max_size=2048, quality=12):
+    def export_as_jpeg(
+        self, document=None, output_path=None, max_size=2048, quality=12
+    ):
         """
         Export a Jpeg image from the given document or from the current document.
 
@@ -414,13 +429,13 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
                 try:
                     active_doc = document or adobe.app.activeDocument
-                except RuntimeError, e:
+                except RuntimeError as e:
                     # Exceptions reported by Photoshop CEP through the RPC API
                     # are pretty useless, so catch the error, raise our own exception
                     # but still log the original exception for debug purpose.
                     self.logger.debug(
                         "Unable to retrieve a document: %s" % e,
-                        exc_info=True, # Get traceback automatically
+                        exc_info=True,  # Get traceback automatically
                     )
                     raise RuntimeError("Unable to retrieve a document")
 
@@ -455,9 +470,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                         jpeg_width = max(min(int(doc_width * scale), doc_width), 1)
                         jpeg_height = max(min(int(doc_height * scale), doc_height), 1)
                 else:
-                    raise RuntimeError("Unable to retrieve document size from %s x %s " % (
-                        width_str, height_str,
-                    ))
+                    raise RuntimeError(
+                        "Unable to retrieve document size from %s x %s "
+                        % (width_str, height_str,)
+                    )
 
                 # Get a file object from Photoshop for this path and the current
                 # jpg save options:
@@ -477,8 +493,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                     # Resize if needed:
                     if jpeg_width and jpeg_height:
                         jpeg_doc.resizeImage(
-                            "%d px" % jpeg_width,
-                            "%d px" % jpeg_height
+                            "%d px" % jpeg_width, "%d px" % jpeg_height
                         )
                     # Save:
                     jpeg_doc.saveAs(jpeg_file, jpeg_options, True)
@@ -503,55 +518,6 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         """
         self.__add_to_context_cache(path, context)
 
-    def add_model_sheet_layer(self,
-                                project_name,
-                                project_type,
-                                asset_name,
-                                task_name,
-                                version_name,
-                                asset_type,
-                                episode_name,
-                                ship_episode,
-                                current_sc,
-                                sap_number,
-                                assigned_to,
-                                banner_color,
-                                font,
-                                show_logo,
-                                show_labels,
-                                show_date,
-                                show_disclaimer) :
-        """
-        Create a New Layer in the current Document.
-
-        :param project_name: The path of the active document.
-        :param project_type: Project Type 2D/3D.
-        """
-
-        model_sheet_layer = imp.load_source('model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','model_sheet_layer.py'))
-
-        # add the model sheet layer
-        model_sheet_layer.model_sheet_layer(
-                                self,
-                                project_name,
-                                project_type,
-                                asset_name,
-                                task_name,
-                                version_name,
-                                asset_type,
-                                episode_name,
-                                ship_episode,
-                                current_sc,
-                                sap_number,
-                                assigned_to,
-                                banner_color,
-                                font,
-                                show_logo,
-                                show_labels,
-                                show_date,
-                                show_disclaimer
-                                )
-
 
     def generate_thumbnail(self, document=None, output_path=None):
         """
@@ -573,13 +539,13 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 document,
                 output_path,
                 max_size=self.MAX_THUMB_SIZE,
-                quality=3, # Default quality value for Photoshop Jpeg option
+                quality=3,  # Default quality value for Photoshop Jpeg option
             )
-        except Exception, e:
+        except Exception as e:
             # Log the error for debug purpose.
             self.logger.warning(
                 "Couldn't generate thumbnail: %s" % e,
-                exc_info=True, # include traceback
+                exc_info=True,  # include traceback
             )
         return jpeg_path
 
@@ -695,7 +661,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             parent=self._get_dialog_parent(),
             caption="Save As",
             directory=doc_path,
-            filter="Photoshop Documents (*.psd)"
+            filter="Photoshop Documents (*.psd)",
         )
         file_dialog.setLabelText(QtGui.QFileDialog.Accept, "Save")
         file_dialog.setLabelText(QtGui.QFileDialog.Reject, "Cancel")
@@ -750,6 +716,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         except Exception:
             if self._FAILED_PINGS >= self.SHOTGUN_ADOBE_HEARTBEAT_TOLERANCE:
                 from sgtk.platform.qt import QtCore
+
                 QtCore.QCoreApplication.instance().quit()
             else:
                 self._FAILED_PINGS += 1
@@ -814,7 +781,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         # If the _adobe attribute is set, then we can forward logging calls
         # back to the js process via rpc.
-        if hasattr(self, '_adobe'):
+        if hasattr(self, "_adobe"):
 
             level = self.PY_TO_JS_LOG_LEVEL_MAPPING[record.levelname]
 
@@ -827,10 +794,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
             # we don't use the handler's format method here because the adobe
             # side expects a certain format.
-            msg_str = "[%s]: %s" % (
-                record.levelname,
-                record.message
-            )
+            msg_str = "[%s]: %s" % (record.levelname, record.message)
 
             sys.stdout.write(msg_str)
             sys.stdout.flush()
@@ -855,8 +819,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # Make sure we have a properly-encoded string for the path. We can
         # possibly get a file path/name that contains unicode, and we don't
         # want to deal with that later on.
-        if isinstance(active_document_path, unicode):
-            active_document_path = active_document_path.encode("utf-8")
+        active_document_path = six.ensure_str(active_document_path)
 
         # This will be True if the context_changes_disabled context manager is
         # used. We're just in a temporary state of not allowing context changes,
@@ -886,9 +849,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 self.logger.debug("Document found in context cache: %r" % context)
             else:
                 try:
-                    context = sgtk.sgtk_from_path(active_document_path).context_from_path(
-                        active_document_path,
-                        previous_context=self.context,
+                    context = sgtk.sgtk_from_path(
+                        active_document_path
+                    ).context_from_path(
+                        active_document_path, previous_context=self.context,
                     )
                     self.__add_to_context_cache(active_document_path, context)
                 except Exception:
@@ -904,8 +868,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                     # SGTK control.
                     if self._PROJECT_CONTEXT is None:
                         self._PROJECT_CONTEXT = sgtk.Context(
-                            tk=self.context.sgtk,
-                            project=self.context.project,
+                            tk=self.context.sgtk, project=self.context.project,
                         )
 
                     context = self._PROJECT_CONTEXT
@@ -947,7 +910,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 for command in self.commands.values():
                     if command.get("properties", dict()).get("uid") == uid:
                         self.logger.debug(
-                            "Executing callback for command: %s" % (command,))
+                            "Executing callback for command: %s" % (command,)
+                        )
                         result = command["callback"]()
                         if isinstance(result, QtGui.QWidget):
                             # if the callback returns a widget, keep a handle on it
@@ -964,11 +928,13 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # manually create a record to log to the standard file handler.
         # we format it to match the regular logs, but tack on the '.js' to
         # indicate that it came from javascript.
-        record = logging.makeLogRecord({
-            "levelname": level.upper(),
-            "name": "%s.js" % (self.logger.name,),
-            "msg": message,
-        })
+        record = logging.makeLogRecord(
+            {
+                "levelname": level.upper(),
+                "name": "%s.js" % (self.logger.name,),
+                "msg": message,
+            }
+        )
 
         # forward this message to the base file handler so that it is logged
         # appropriately.
@@ -1026,6 +992,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # wrong in the test suite. We'll just trap that and print it
             # as an error without letting it bubble up any farther.
             import traceback
+
             self.logger.error(
                 "Tests raised the following:\n%s" % traceback.format_exc(exc)
             )
@@ -1082,7 +1049,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         try:
             self.logger.debug("Pausing heartbeat...")
             self._HEARTBEAT_DISABLED = True
-        except Exception, e:
+        except Exception as e:
             self.logger.debug("Unable to pause heartbeat as requested.")
             self.logger.error(str(e))
         else:
@@ -1174,8 +1141,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         """
         if not self._WIN32_PHOTOSHOP_MAIN_HWND:
             found_hwnds = self.__tk_photoshopcc.win_32_api.find_windows(
-                class_name="Photoshop",
-                stop_if_found=True,
+                class_name="Photoshop", stop_if_found=True,
             )
 
             if found_hwnds:
@@ -1255,8 +1221,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # dialogs to notify the Photoshop application window when they're
             # opened or closed, so we'll disable that behavior.
             win_ex_style = self.__tk_photoshopcc.win_32_api.GetWindowLong(
-                proxy_win_hwnd,
-                self.__tk_photoshopcc.win_32_api.GWL_EXSTYLE,
+                proxy_win_hwnd, self.__tk_photoshopcc.win_32_api.GWL_EXSTYLE,
             )
 
             self.__tk_photoshopcc.win_32_api.SetWindowLong(
@@ -1319,10 +1284,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         # create the dialog:
         dialog, widget = self._create_dialog_with_widget(
-            title,
-            bundle,
-            widget_class,
-            *args, **kwargs
+            title, bundle, widget_class, *args, **kwargs
         )
 
         # Note - the base engine implementation will try to clean up
@@ -1363,16 +1325,13 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         if not self.has_ui:
             self.logger.error(
                 "Sorry, this environment does not support UI display! Cannot "
-                "show the requested window '%s'." % title)
+                "show the requested window '%s'." % title
+            )
             return
 
         # create the dialog:
         dialog, widget = self._create_dialog_with_widget(
-            title,
-            bundle,
-            widget_class,
-            *args,
-            **kwargs
+            title, bundle, widget_class, *args, **kwargs
         )
 
         # Note - the base engine implementation will try to clean up
@@ -1501,7 +1460,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         # iterate over all the registered commands and gather the necessary info
         # to display them in adobe
-        for (command_name, command_info) in self.commands.iteritems():
+        for (command_name, command_info) in self.commands.items():
 
             # commands come with a dict of properties that may or may not
             # contain certain data.
@@ -1548,11 +1507,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         jump_commands = []
 
         # the icon to use for the command. bundled with the engine
-        sg_icon = os.path.join(
-            self.disk_location,
-            "resources",
-            "shotgun_logo.png"
-        )
+        sg_icon = os.path.join(self.disk_location, "resources", "shotgun_logo.png")
 
         jump_commands.append(
             dict(
@@ -1568,9 +1523,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
             # the icon to use for the command. bundled with the engine
             fs_icon = os.path.join(
-                self.disk_location,
-                "resources",
-                "shotgun_folder.png"
+                self.disk_location, "resources", "shotgun_folder.png"
             )
 
             jump_commands.append(
@@ -1593,8 +1546,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # force the Jump to Shotgun and Jump to Filesystem commands onto the
         # front of the list to match other integrations.
         context_menu_cmds = jump_commands + sorted(
-            context_menu_cmds,
-            key=lambda d: d["display_name"],
+            context_menu_cmds, key=lambda d: d["display_name"],
         )
 
         # ---- populate the state structure to hand over to adobe
@@ -1634,16 +1586,12 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
             from sgtk.platform.qt import QtCore
 
-            timer = QtCore.QTimer(
-                parent=QtCore.QCoreApplication.instance(),
-            )
+            timer = QtCore.QTimer(parent=QtCore.QCoreApplication.instance(),)
 
             timer.timeout.connect(self._check_connection)
 
             # The class variable is in seconds, so multiply to get milliseconds.
-            timer.start(
-                self.SHOTGUN_ADOBE_HEARTBEAT_INTERVAL * 1000.0,
-            )
+            timer.start(self.SHOTGUN_ADOBE_HEARTBEAT_INTERVAL * 1000.0,)
 
             self._CHECK_CONNECTION_TIMER = timer
             self.log_debug("Connection timer created and started.")
@@ -1653,6 +1601,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         Jump to shotgun, launch web browser
         """
         from sgtk.platform.qt import QtGui, QtCore
+
         url = self.context.shotgun_url
         QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
@@ -1706,7 +1655,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             self.logger.info("Storing context cache1: %s" % context)
 
             serial_cache = dict()
-            for k, v in self._CONTEXT_CACHE.iteritems():
+            for k, v in self._CONTEXT_CACHE.items():
                 serial_cache[k] = v.serialize()
 
             self.logger.debug("Storing context cache: %s" % serial_cache)
@@ -1755,7 +1704,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         fields = self.execute_hook_method(
             "context_fields_display_hook",
             "get_entity_fields",
-            entity_type=entity["type"]
+            entity_type=entity["type"],
         )
 
         # always try to query the image for the entity
@@ -1767,7 +1716,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         # kick off an async request to query the necessary fields
         self.__context_find_uid = self.__sg_data.execute_find_one(
-            entity_type, [["id", "is", entity_id]], fields)
+            entity_type, [["id", "is", entity_id]], fields
+        )
 
     def __on_worker_failure(self, uid, msg):
         """
@@ -1830,14 +1780,14 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             else:
                 if context_entity["type"] in ["Asset", "Project", "Shot", "Task"]:
                     thumb_path = "../images/default_%s_thumb_dark.png" % (
-                        context_entity["type"])
+                        context_entity["type"]
+                    )
                     data["thumb_path"] = thumb_path
                 else:
                     thumb_path = "../images/default_Entity_thumb_dark.png"
 
                 data = dict(
-                    thumb_path=thumb_path,
-                    url=self.get_entity_url(context_entity),
+                    thumb_path=thumb_path, url=self.get_entity_url(context_entity),
                 )
                 self.adobe.send_context_thumbnail(data)
 
@@ -1888,8 +1838,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
     def get_entity_url(self, entity):
         """Helper method to return a SG url for the supplied entity."""
-        return "%s/detail/%s/%d" % (
-            self.sgtk.shotgun_url, entity["type"], entity["id"])
+        return "%s/detail/%s/%d" % (self.sgtk.shotgun_url, entity["type"], entity["id"])
 
     def get_panel_link(self, url, text):
         """
@@ -1897,17 +1846,15 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         will launch the supplied url in the default browser.
         """
 
-        return \
-            """
+        return """
             <a
               href='#'
               class='sg_value_link'
               onclick='sg_panel.Panel.open_external_url("{url}")'
             >{text}</a>
             """.format(
-                url=url,
-                text=text,
-            )
+            url=url, text=text,
+        )
 
     def __activate_python(self):
         """
@@ -1925,17 +1872,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
 
 # a little action script to activate the given python process.
-OSX_ACTIVATE_SCRIPT = \
-"""
+OSX_ACTIVATE_SCRIPT = """
 tell application "System Events"
   set frontmost of the first process whose unix id is {pid} to true
 end tell
-""".format(pid=os.getpid())
-
-
-
-
-
-
-
-
+""".format(
+    pid=os.getpid()
+)

@@ -1,11 +1,11 @@
 # Copyright (c) 2019 Shotgun Software Inc.
-# 
+#
 # CONFIDENTIAL AND PROPRIETARY
-# 
-# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit 
+#
+# This work is provided "AS IS" and subject to the Shotgun Pipeline Toolkit
 # Source Code License included in this distribution package. See LICENSE.
-# By accessing, using, copying or modifying this work you indicate your 
-# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights 
+# By accessing, using, copying or modifying this work you indicate your
+# agreement to the Shotgun Pipeline Toolkit Source Code License. All rights
 # not expressly granted therein are reserved by Shotgun Software Inc.
 import os
 import sys
@@ -62,7 +62,9 @@ def compute_environment():
 
     framework_location = _get_adobe_framework_location()
     if framework_location is None:
-        raise EngineConfigurationError('The tk-framework-adobe could not be found in the current environment. Please check the log for more information.')
+        raise EngineConfigurationError(
+            "The tk-framework-adobe could not be found in the current environment. Please check the log for more information."
+        )
 
     _ensure_framework_is_installed(framework_location)
 
@@ -70,18 +72,6 @@ def compute_environment():
     env["SHOTGUN_ADOBE_PYTHON"] = sys.executable
     env["SHOTGUN_ADOBE_FRAMEWORK_LOCATION"] = framework_location
     env["SHOTGUN_ENGINE"] = "tk-photoshopcc"
-
-    # We're going to append all of this Python process's sys.path to the
-    # PYTHONPATH environment variable. This will ensure that we have access
-    # to all libraries available in this process in subprocesses like the
-    # Python process that is spawned by the Shotgun CEP extension on launch
-    # of an Adobe host application. We're appending instead of setting because
-    # we don't want to stomp on any PYTHONPATH that might already exist that
-    # we want to persist when the Python subprocess is spawned.
-    sgtk.util.append_path_to_env_var(
-        "PYTHONPATH",
-        os.pathsep.join(sys.path),
-    )
     env["PYTHONPATH"] = os.environ["PYTHONPATH"]
 
     return env
@@ -109,10 +99,14 @@ def _get_adobe_framework_location():
     env = engine.tank.pipeline_configuration.get_environment(env_name)
     engine_desc = env.get_engine_descriptor("tk-photoshopcc")
     if env_name is None:
-        logger.warn(("The current environment {!r} "
-                     "is not configured to run the tk-photohopcc "
-                     "engine. Please add the engine to your env-file: "
-                     "{!r}").format(env, env.disk_location))
+        logger.warn(
+            (
+                "The current environment {!r} "
+                "is not configured to run the tk-photohopcc "
+                "engine. Please add the engine to your env-file: "
+                "{!r}"
+            ).format(env, env.disk_location)
+        )
         return
 
     framework_name = None
@@ -124,8 +118,12 @@ def _get_adobe_framework_location():
             framework_name = "_".join(name_parts)
             break
     else:
-        logger.warn(("The engine tk-photoshopcc must have the "
-                     "tk-framework-adobe configured in order to run"))
+        logger.warn(
+            (
+                "The engine tk-photoshopcc must have the "
+                "tk-framework-adobe configured in order to run"
+            )
+        )
         return
 
     desc = env.get_framework_descriptor(framework_name)
@@ -145,9 +143,8 @@ def _ensure_framework_is_installed(framework_location):
 
     sys.path.insert(0, bootstrap_python_path)
     import tk_framework_adobe_utils.startup as startup_utils
+
     sys.path.remove(bootstrap_python_path)
 
     # installing the CEP extension.
     startup_utils.ensure_extension_up_to_date(logger)
-
-
