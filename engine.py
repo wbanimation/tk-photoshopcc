@@ -303,15 +303,36 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # the adobe framework, and is generic, we should handle it here.
         file_to_open = os.environ.get("SGTK_FILE_TO_OPEN")
 
+        # Launch the add_model_sheet app and run it. Processes PublishedFile ids
+        # stored in an environment variable. This works the same way as if it was
+        # running in engine_init.
+        #
+        # We run it here seemingly just so we can use the show_busy() modal. It
+        # can't be used when running from engine_init because there's no QApplication
+        # available yet.
+        # See https://community.shotgunsoftware.com/t/issue-commands-to-an-engine/3557/7
         if "MODELSHEET_PUB_FILE_IDS" in os.environ:
+            # run the add_model_sheet app action.
+            self.logger.info(
+                "MODELSHEET_PUB_FILE_IDS env var set. Launching tk-multi-addmodelsheet"
+            )
+            modelsheet_app = self.apps.get("tk-multi-addmodelsheet")
+            if modelsheet_app is None:
+                self.logger.error(
+                    "Unable to run tk-multi-addmodelsheet. The app is not enabled."
+                )
+            else:
+                with self.context_changes_disabled():
+                    try:
+                        modelsheet_app.add_layer_from_env()
+                    except Exception as e:
+                        self.logger.exception(e)
+                        # if we run into an error, let's show it to the user in Photoshop
+                        self.adobe.rpc_eval("alert(\"%s\");" % e)
+                    finally:
+                        self.clear_busy()
 
-            self.logger.info ('CC engine: Launching Add Model Sheet... ')
-
-            # load the model sheet module
-            add_model_sheet_layer = imp.load_source('add_model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','add_model_sheet_layer.py'))
-            self.logger.info("imported add_model_sheet_layer: %s" % add_model_sheet_layer)
-            add_model_sheet_layer.add_model_sheet_layer(self)
-        elif "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
+        if "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
 
             self.logger.info ('Preparing To Load Files... ')
 
@@ -496,55 +517,6 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         :param context: The current context form the document.
         """
         self.__add_to_context_cache(path, context)
-
-    def add_model_sheet_layer(self,
-                                project_name,
-                                project_type,
-                                asset_name,
-                                task_name,
-                                version_name,
-                                asset_type,
-                                episode_name,
-                                ship_episode,
-                                current_sc,
-                                sap_number,
-                                assigned_to,
-                                banner_color,
-                                font,
-                                show_logo,
-                                show_labels,
-                                show_date,
-                                show_disclaimer) :
-        """
-        Create a New Layer in the current Document.
-
-        :param project_name: The path of the active document.
-        :param project_type: Project Type 2D/3D.
-        """
-
-        model_sheet_layer = imp.load_source('model_sheet_layer', os.path.join(os.path.dirname(os.path.realpath(__file__)),'add_model_sheet_layer','model_sheet_layer.py'))
-
-        # add the model sheet layer
-        model_sheet_layer.model_sheet_layer(
-                                self,
-                                project_name,
-                                project_type,
-                                asset_name,
-                                task_name,
-                                version_name,
-                                asset_type,
-                                episode_name,
-                                ship_episode,
-                                current_sc,
-                                sap_number,
-                                assigned_to,
-                                banner_color,
-                                font,
-                                show_logo,
-                                show_labels,
-                                show_date,
-                                show_disclaimer
-                                )
 
 
     def generate_thumbnail(self, document=None, output_path=None):
