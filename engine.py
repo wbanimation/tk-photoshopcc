@@ -322,15 +322,17 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                     "Unable to run tk-multi-addmodelsheet. The app is not enabled."
                 )
             else:
-                with self.context_changes_disabled():
-                    try:
-                        modelsheet_app.add_layer_from_env()
-                    except Exception as e:
-                        self.logger.exception(e)
-                        # if we run into an error, let's show it to the user in Photoshop
-                        self.adobe.rpc_eval("alert(\"%s\");" % e)
-                    finally:
-                        self.clear_busy()
+                with self.heartbeat_disabled():
+                    with self.context_changes_disabled():
+                        try:
+                            self.logger.info("running tk-multi-addmodelsheet.add_layer_from_env()")
+                            modelsheet_app.add_layer_from_env()
+                        except Exception as e:
+                            self.logger.exception(e)
+                            # if we run into an error, let's show it to the user in Photoshop
+                            self.adobe.rpc_eval("alert(\"%s\");" % e)
+                        finally:
+                            self.clear_busy()
 
         if "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
 
