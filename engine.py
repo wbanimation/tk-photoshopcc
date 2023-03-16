@@ -15,8 +15,6 @@ import tempfile
 import threading
 import uuid
 import re
-import imp
-import json
 
 from contextlib import contextmanager
 
@@ -308,22 +306,9 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # Sets up the heartbeat timer to run asynchronously.
         self.__setup_connection_timer(force=True)
 
-        # Normally the bootstrap logic would handle the file open, but since the bootstrap logic is handled by
-        # the adobe framework, and is generic, we should handle it here.
-        file_to_open = os.environ.get("SGTK_FILE_TO_OPEN")
-
-        # Launch the add_model_sheet app and run it. Processes PublishedFile ids
-        # stored in an environment variable. This works the same way as if it was
-        # running in engine_init.
-        #
-        # We run it here seemingly just so we can use the show_busy() modal. It
-        # can't be used when running from engine_init because there's no QApplication
-        # available yet.
-        # See https://community.shotgunsoftware.com/t/issue-commands-to-an-engine/3557/7
-        if "MODELSHEET_PUB_FILE_IDS" in os.environ:
-            # run the add_model_sheet app action.
+        if "MODELSHEET_SESSION_UUID" in os.environ:
             self.logger.info(
-                "MODELSHEET_PUB_FILE_IDS env var set. Launching tk-multi-addmodelsheet"
+                "MODELSHEET_SESSION_UUID env var set. Launching tk-multi-addmodelsheet"
             )
             modelsheet_app = self.apps.get("tk-multi-addmodelsheet")
             if modelsheet_app is None:
@@ -334,65 +319,19 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 with self.heartbeat_disabled():
                     with self.context_changes_disabled():
                         try:
-                            self.logger.info("running tk-multi-addmodelsheet.add_layer_from_env()")
+                            self.logger.info(
+                                "running tk-multi-addmodelsheet.add_layer_from_env()"
+                            )
                             modelsheet_app.add_layer_from_env()
                         except Exception as e:
                             self.logger.exception(e)
                             # if we run into an error, let's show it to the user in Photoshop
-                            self.adobe.rpc_eval("alert(\"%s\");" % e)
+                            self.adobe.rpc_eval(
+                                'alert("Error running Photoshop Add Modelsheet: %s");'
+                                % e
+                            )
                         finally:
                             self.clear_busy()
-
-        if "SHOTGUN_LOAD_FILES_ON_OPEN" in os.environ :
-
-            self.logger.info ('Preparing To Load Files... ')
-
-            # grab the environment variables that were set for us
-            published_files_to_open = json.loads(os.environ.get('SHOTGUN_LOAD_FILES_ON_OPEN'))
-
-            for path in published_files_to_open.keys() :
-                # double check that the file exists. it will crash engine if it does not...
-                if os.path.exists(path) :
-                    self.logger.info ('Opening File: %s' % path)
-
-                    context = self.sgtk.context_from_entity(published_files_to_open[path]['entity_type'],published_files_to_open[path]['id'])
-                    self.__add_to_context_cache(path, context)
-
-                    # open the file
-                    self.adobe.app.load(self.adobe.File(path))
-                    sgtk.platform.change_context(context)
-
-                else :
-                    del published_files_to_open[path]
-
-            del os.environ["SHOTGUN_LOAD_FILES_ON_OPEN"]
-
-        # if there are no files to open found in the env launch WorkFiles2 'File Open...'
-        # this happens in the post_qt_init() for each specific engine
-        if file_to_open:
-            self.logger.info ('Opening File: %s' % file_to_open)
-            # open the specified file
-            self.adobe.app.open(self.adobe.File(file_to_open))
-            # clear the environment variable after loading so that it doesn't get reopened on an engine restart.
-            del os.environ["SGTK_FILE_TO_OPEN"]
-        else:
-            # If there is no file_to_open show WorkFiles 'File Open...'
-            if len(list(self.adobe.app.documents)) == 0:
-
-                # launch Task Buddy if available...
-#                 if 'Task Buddy...' in self.commands :
-#                     self.logger.info ('Opening Task Buddy...')
-#                     uid = self.commands['Task Buddy...']['properties']['uid']
-#                     self.logger.info ('   uid: %s' % uid)
-#                     self._handle_command(uid)
-
-                # if not, check for the File Open command and launch it...
-#                 elif 'File Open...' in self.commands :
-                if 'File Open...' in self.commands :
-                    self.logger.info ('Opening WorkFiles2...')
-                    uid = self.commands['File Open...']['properties']['uid']
-                    self.logger.info ('   uid: %s' % uid)
-                    self._handle_command(uid)
 
     def register_command(self, name, callback, properties=None):
         """
@@ -525,7 +464,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 adobe.app.displayDialogs = original_dialog_mode
         return jpeg_pub_path
 
-    def add_to_context_cache(self, path, context) :
+    def add_to_context_cache(self, path, context):
         """
         Add a path:context entry to the _CONTEXT_CACHE.
 
@@ -533,7 +472,6 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         :param context: The current context form the document.
         """
         self.__add_to_context_cache(path, context)
-
 
     def generate_thumbnail(self, document=None, output_path=None):
         """
