@@ -306,32 +306,48 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # Sets up the heartbeat timer to run asynchronously.
         self.__setup_connection_timer(force=True)
 
+        # Since we're now supporting the legacy and new modelsheet apps, we need to temporarilly
+        # support the logic for both here. We have to load the new app code when we detect the
+        # MODELSHEET_SESSION_UUID env var, but we also need to support the legacy env var for
+        # backwards compatibility and loading the old version of the app.
+        run_modelsheet_app = False
+        # new modelsheet app
+        self.logger.debug(
+            "checking for MODELSHEET_SESSION_UUID or MODELSHEET_PUB_FILE_IDS env var..."
+        )
         if "MODELSHEET_SESSION_UUID" in os.environ:
+            run_modelsheet_app = True
             self.logger.info(
-                "MODELSHEET_SESSION_UUID env var set. Launching tk-multi-addmodelsheet"
+                "MODELSHEET_SESSION_UUID env var set. Launching tk-multi-addmodelsheet-beta"
+            )
+            modelsheet_app = self.apps.get("tk-multi-addmodelsheet-beta")
+        # legacy modelsheet app
+        elif "MODELSHEET_PUB_FILE_IDS" in os.environ:
+            run_modelsheet_app = True
+            # run the add_model_sheet app action.
+            self.logger.info(
+                "MODELSHEET_PUB_FILE_IDS env var set. Launching tk-multi-addmodelsheet (legacy)"
             )
             modelsheet_app = self.apps.get("tk-multi-addmodelsheet")
+
+        if run_modelsheet_app:
             if modelsheet_app is None:
                 self.logger.error(
-                    "Unable to run tk-multi-addmodelsheet. The app is not enabled."
+                    "Unable to run tk-multi-addmodelsheet-beta. The app is not enabled."
                 )
             else:
-                with self.heartbeat_disabled():
-                    with self.context_changes_disabled():
-                        try:
-                            self.logger.info(
-                                "running tk-multi-addmodelsheet.add_layer_from_env()"
-                            )
-                            modelsheet_app.add_layer_from_env()
-                        except Exception as e:
-                            self.logger.exception(e)
-                            # if we run into an error, let's show it to the user in Photoshop
-                            self.adobe.rpc_eval(
-                                'alert("Error running Photoshop Add Modelsheet: %s");'
-                                % e
-                            )
-                        finally:
-                            self.clear_busy()
+                try:
+                    self.logger.info("running add_layer_from_env() %s" % modelsheet_app)
+                    # NOTE: this quits photoshop when it's done.
+                    modelsheet_app.add_layer_from_env()
+                except Exception as e:
+                    self.logger.exception(e)
+                    # if we run into an error, let's show it to the user in Photoshop
+                    self.adobe.rpc_eval(
+                        'alert("Error running Photoshop Add Modelsheet: %s");' % e
+                    )
+                finally:
+                    self.clear_busy()
 
     def register_command(self, name, callback, properties=None):
         """
