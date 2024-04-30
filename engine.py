@@ -480,15 +480,6 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                 adobe.app.displayDialogs = original_dialog_mode
         return jpeg_pub_path
 
-    def add_to_context_cache(self, path, context):
-        """
-        Add a path:context entry to the _CONTEXT_CACHE.
-
-        :param path: The path of the active document.
-        :param context: The current context form the document.
-        """
-        self.__add_to_context_cache(path, context)
-
     def generate_thumbnail(self, document=None, output_path=None):
         """
         Try to generate a thumbnail for an open document.
@@ -1636,8 +1627,6 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # project boundaries.
             self._CONTEXT_CACHE[path] = context
 
-            self.logger.info("Storing context cache1: %s" % context)
-
             serial_cache = dict()
             for k, v in self._CONTEXT_CACHE.items():
                 serial_cache[k] = v.serialize()
@@ -1655,8 +1644,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         :returns: Context object, or None
         """
-        self.logger.info("===== _CONTEXT_CACHE: %s" % (self._CONTEXT_CACHE,))
-
+        self.logger.debug("Getting path from context cache (%s): %s" % (path, self._CONTEXT_CACHE))
         return self._CONTEXT_CACHE.get(path)
 
     def __request_context_display(self, entity):
