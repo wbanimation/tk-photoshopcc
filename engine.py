@@ -1334,22 +1334,6 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
 
         return status, widget
 
-    def _add_to_context_cache(self, path, context):
-        """
-        Adds a context to the cache for the supplied path.
-
-        This is just a wrapper around the internal method for convenience since we need
-        to call this from our hooks in order to ensure that the Task is saved to the
-        context cache when versioning up files. This is required because the task token
-        is in the filename and TK's context_from_path method builds the context from the
-        path cache entry which doesn't include filenames so no Task information exists in
-        the path cache entry.
-
-        :param str path: The path to the document.
-        :param sgtk.Context context: The context to cache.
-        """
-        self.__add_to_context_cache(path, context)
-
     ############################################################################
     # internal methods
 
