@@ -540,7 +540,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # make the document being processed the active document
             self.adobe.app.activeDocument = document
 
-            (_, ext) = os.path.splitext(path)
+            _, ext = os.path.splitext(path)
             ext = ext.lower()
 
             # first, check if file is .psb since it is processed using the adobe bridge
@@ -649,7 +649,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # which gives something like:
         # Adobe Photoshop Version: 2017.1.1 20170425.r.252 2017/04/25:23:00:00 CL 1113967  x64\rNumber of .....
         # and use it instead if available.
-        m = re.search("Version:\s+([\.0-9]+)", self.adobe.app.systemInformation)
+        m = re.search("Version:\\s+([\\.0-9]+)", self.adobe.app.systemInformation)
         if m:
             version = m.group(1)
         return {
@@ -1062,13 +1062,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         if not base:
             raise ImportError("Unable to find a QT Python module")
 
-        QtCore = base["qt_core"]
         QtGui = base["qt_gui"]
-
-        # tell QT4 to interpret C strings as utf-8
-        # note: this will be ignored on QT5 via our shim
-        utf8 = QtCore.QTextCodec.codecForName("utf-8")
-        QtCore.QTextCodec.setCodecForCStrings(utf8)
 
         # override message boxes
         self._override_qmessagebox(QtGui.QMessageBox)
@@ -1703,15 +1697,11 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             self.__context_find_uid = None
 
             # send an error message back to the context header.
-            self.adobe.send_context_display(
-                """
+            self.adobe.send_context_display("""
                 There was an error retrieving fields for this context. Please
                 see the logs for the specific error message. If this is a
                 recurring error and you need further assistance, please
-                contact our support team via {}.""".format(
-                    sgtk.support_url
-                )
-            )
+                contact our support team via {}.""".format(sgtk.support_url))
             self.logger.error("Failed to query context fields: %s" % (msg,))
 
         elif uid == self.__context_thumb_uid:
@@ -1865,6 +1855,4 @@ OSX_ACTIVATE_SCRIPT = """
 tell application "System Events"
   set frontmost of the first process whose unix id is {pid} to true
 end tell
-""".format(
-    pid=os.getpid()
-)
+""".format(pid=os.getpid())
