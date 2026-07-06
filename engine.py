@@ -187,6 +187,11 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         self.__context_find_uid = None
         self.__context_thumb_uid = None
 
+        # async task lookup triggered from _handle_active_document_change when
+        # context_from_path fails and the filename matches a known template.
+        self.__task_find_uid = None
+        self.__task_find_active_doc_path = None
+
         # keep track if sg global schema has been cached
         self.__schema_loaded = False
 
@@ -868,10 +873,17 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                                 continue
                         if task_token and entity_name and entity_type:
                             self.logger.debug(
-                                "Found a task token and entity name in the filename. Trying to find a context based on that: %s %s %s"
+                                "Found a task token and entity name in the filename. "
+                                "Submitting async SG query for: %s %s %s"
                                 % (task_token, entity_type, entity_name)
                             )
-                            sg_task = self.shotgun.find_one(
+                            # Cancel any previous pending task lookup (can be superseded
+                            # by a rapid document switch) and submit a fresh one.
+                            # The context switch happens in __on_worker_signal once the
+                            # result arrives.
+                            self.__task_find_uid = None
+                            self.__task_find_active_doc_path = active_document_path
+                            self.__task_find_uid = self.__sg_data.execute_find_one(
                                 "Task",
                                 [
                                     ["project", "is", self.context.project],
@@ -880,24 +892,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                                 ],
                                 [],
                             )
-                            if sg_task:
-                                context = self.sgtk.context_from_entity(
-                                    "Task", sg_task["id"]
-                                )
-                                self.add_to_context_cache(active_document_path, context)
-                                # make sure folders are created so when we switch contexts workfiles doesn't complain
-                                # but only if the context is different - this is expensive.
-                                if context != self.context:
-                                    self.sgtk.create_filesystem_structure(
-                                        "Task", sg_task["id"], self.name
-                                    )
-                                self.logger.debug(
-                                    "Document context found from filename: %r" % context
-                                )
-                            else:
-                                self.logger.debug(
-                                    "Unable to find a task in shotgun based on the filename. Not changing context."
-                                )
+                            # Return now — the context switch (or project-context
+                            # fallback) will be applied in __on_worker_signal /
+                            # __on_worker_failure when the result arrives.
+                            return
                     except Exception:
                         self.logger.exception(
                             "Error trying to set context from filename: %s"
@@ -1452,6 +1450,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # clear existing context requests to prevent unnecessary processing
         self.__context_find_uid = None
         self.__context_thumb_uid = None
+        self.__task_find_uid = None
         self.__sg_data.clear()
 
         # determine the best entity to show for the current context
@@ -1778,6 +1777,21 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             # should be sufficient
             self.logger.error("Failed to query context thumbnail: %s" % (msg,))
 
+        elif uid == self.__task_find_uid:
+            self.__task_find_uid = None
+            self.logger.warning(
+                "Async SG task lookup failed: %s. Falling back to project context."
+                % (msg,)
+            )
+            if self._PROJECT_CONTEXT is None:
+                self._PROJECT_CONTEXT = sgtk.Context(
+                    tk=self.context.sgtk,
+                    project=self.context.project,
+                )
+            if self._PROJECT_CONTEXT != self.context:
+                self.adobe.context_about_to_change()
+                sgtk.platform.change_context(self._PROJECT_CONTEXT)
+
     def __on_worker_signal(self, uid, request_type, data):
         """
         Signaled whenever the worker completes something.
@@ -1841,6 +1855,38 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             data["url"] = self.get_entity_url(context_entity)
 
             self.adobe.send_context_thumbnail(data)
+
+        # async Task lookup from _handle_active_document_change filename fallback
+        elif uid == self.__task_find_uid:
+            self.__task_find_uid = None
+            active_doc_path = self.__task_find_active_doc_path
+
+            sg_task = data.get("sg")
+            if sg_task:
+                context = self.sgtk.context_from_entity("Task", sg_task["id"])
+                self.add_to_context_cache(active_doc_path, context)
+                if context != self.context:
+                    self.sgtk.create_filesystem_structure(
+                        "Task", sg_task["id"], self.name
+                    )
+                self.logger.debug(
+                    "Document context found from async filename lookup: %r" % context
+                )
+            else:
+                self.logger.debug(
+                    "Async task lookup returned no results for %s. "
+                    "Falling back to project context." % active_doc_path
+                )
+                if self._PROJECT_CONTEXT is None:
+                    self._PROJECT_CONTEXT = sgtk.Context(
+                        tk=self.context.sgtk,
+                        project=self.context.project,
+                    )
+                context = self._PROJECT_CONTEXT
+
+            if context and context != self.context:
+                self.adobe.context_about_to_change()
+                sgtk.platform.change_context(context)
 
     def __get_project_id(self):
         """Helper method to return the project id for the current context."""
