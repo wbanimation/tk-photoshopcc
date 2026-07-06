@@ -874,6 +874,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                             sg_task = self.shotgun.find_one(
                                 "Task",
                                 [
+                                    ["project", "is", self.context.project],
                                     ["sg_task_token", "is", task_token],
                                     [f"entity.{entity_type}.code", "is", entity_name],
                                 ],
@@ -885,9 +886,11 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                                 )
                                 self.add_to_context_cache(active_document_path, context)
                                 # make sure folders are created so when we switch contexts workfiles doesn't complain
-                                self.sgtk.create_filesystem_structure(
-                                    "Task", sg_task["id"], self.name
-                                )
+                                # but only if the context is different - this is expensive.
+                                if context != self.context:
+                                    self.sgtk.create_filesystem_structure(
+                                        "Task", sg_task["id"], self.name
+                                    )
                                 self.logger.debug(
                                     "Document context found from filename: %r" % context
                                 )
@@ -897,7 +900,8 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                                 )
                     except Exception:
                         self.logger.exception(
-                            "Error trying to set context from filename: %s" % active_document_path
+                            "Error trying to set context from filename: %s"
+                            % active_document_path
                         )
 
                     if context is None:
