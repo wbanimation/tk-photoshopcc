@@ -895,9 +895,9 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                                 self.logger.debug(
                                     "Unable to find a task in shotgun based on the filename. Not changing context."
                                 )
-                    except Exception as e:
-                        self.logger.error(
-                            "Error trying to set context from filename: %s" % e
+                    except Exception:
+                        self.logger.exception(
+                            "Error trying to set context from filename: %s" % active_document_path
                         )
 
                     if context is None:
