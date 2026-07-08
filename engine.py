@@ -812,6 +812,10 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
         # result in PTR context changes.
         with self.heartbeat_disabled():
             context = None
+            # Invalidate any pending async filename-based task lookup so a stale
+            # result from a previous document can't overwrite this document's context.
+            self.__task_find_uid = None
+            self.__task_find_active_doc_path = None
             if self._CONTEXT_CHANGES_DISABLED:
                 self.logger.debug(
                     "Engine is in 'no context changes' mode. Not changing context."
@@ -869,7 +873,7 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
                                     entity_name = fields.get(entity_type)
                                     task_token = fields.get("TaskToken")
                                     break
-                            except Exception:
+                            except (KeyError, sgtk.TankError):
                                 continue
                         if task_token and entity_name and entity_type:
                             self.logger.debug(
@@ -1862,17 +1866,33 @@ class PhotoshopCCEngine(sgtk.platform.Engine):
             active_doc_path = self.__task_find_active_doc_path
 
             sg_task = data.get("sg")
+            context = None
             if sg_task:
-                context = self.sgtk.context_from_entity("Task", sg_task["id"])
-                self.add_to_context_cache(active_doc_path, context)
-                if context != self.context:
-                    self.sgtk.create_filesystem_structure(
-                        "Task", sg_task["id"], self.name
+                try:
+                    context = self.sgtk.context_from_entity("Task", sg_task["id"])
+                    self.add_to_context_cache(active_doc_path, context)
+                    if context != self.context:
+                        try:
+                            self.sgtk.create_filesystem_structure(
+                                "Task", sg_task["id"], self.name
+                            )
+                        except Exception:
+                            self.logger.warning(
+                                "Failed to create filesystem structure for task %s. "
+                                "Continuing with context switch." % sg_task["id"]
+                            )
+                    self.logger.debug(
+                        "Document context found from async filename lookup: %r"
+                        % context
                     )
-                self.logger.debug(
-                    "Document context found from async filename lookup: %r" % context
-                )
-            else:
+                except Exception:
+                    self.logger.warning(
+                        "Failed to resolve context from task %s. "
+                        "Falling back to project context." % sg_task["id"]
+                    )
+                    context = None
+
+            if context is None:
                 self.logger.debug(
                     "Async task lookup returned no results for %s. "
                     "Falling back to project context." % active_doc_path
