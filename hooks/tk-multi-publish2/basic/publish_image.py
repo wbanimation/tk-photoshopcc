@@ -52,7 +52,7 @@ class PhotoshopCCImagePublishPlugin(HookBaseClass):
         part of its environment configuration.
         """
         # inherit the settings from the base publish plugin
-        base_settings = super(PhotoshopCCImagePublishPlugin, self).settings or {}
+        base_settings = super().settings or {}
 
         # settings specific to this class
         plugin_settings = {
@@ -278,7 +278,7 @@ class PhotoshopCCImagePublishPlugin(HookBaseClass):
 
 
 def _get_default_export_filename(filename, export_format):
-    (basename, ext) = os.path.splitext(filename)
+    basename, ext = os.path.splitext(filename)
 
     ext = "jpg" if export_format == "jpeg" else export_format
 
